@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Test Recorder</h1>
+    
+    <div class="controls">
+      <button id="startBtn" class="btn btn-primary">▶ Start Recording</button>
+      <button id="stopBtn" class="btn btn-danger" disabled>⏹ Stop Recording</button>
+      <button id="pauseBtn" class="btn btn-warning" disabled>⏸ Pause</button>
+    </div>
+
+    <div class="status">
+      <span id="status">Ready</span>
+      <span id="actionCount">Actions: 0</span>
+    </div>
+
+    <div class="script-format">
+      <label>Export Format:</label>
+      <select id="formatSelect">
+        <option value="selenium">Selenium (Python)</option>
+        <option value="cypress">Cypress (JavaScript)</option>
+        <option value="playwright">Playwright (Python)</option>
+      </select>
+    </div>
+
+    <div class="actions">
+      <button id="downloadBtn" class="btn btn-secondary" disabled>📥 Download Script</button>
+      <button id="copyBtn" class="btn btn-secondary" disabled>📋 Copy to Clipboard</button>
+      <button id="clearBtn" class="btn btn-secondary" disabled>🗑 Clear</button>
+    </div>
+
+    <textarea id="scriptPreview" placeholder="Script will appear here..."></textarea>
+
+    <div class="settings">
+      <details>
+        <summary>⚙ Settings</summary>
+        <label>
+          <input type="checkbox" id="captureScreenshots"> Capture Screenshots
+        </label>
+        <label>
+          <input type="checkbox" id="captureNetwork"> Capture Network Requests
+        </label>
+        <label>
+          <input type="checkbox" id="recordWaits" checked> Record Wait Times
+        </label>
+      </details>
+    </div>
+
+    <div id="notifications"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
