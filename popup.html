@@ -6,52 +6,163 @@
 </head>
 <body>
   <div class="container">
-    <h1>Test Recorder</h1>
+    <div class="header">
+      <h1>Test Recorder Pro</h1>
+      <span class="version">v2.0</span>
+    </div>
     
-    <div class="controls">
-      <button id="startBtn" class="btn btn-primary">▶ Start Recording</button>
-      <button id="stopBtn" class="btn btn-danger" disabled>⏹ Stop Recording</button>
-      <button id="pauseBtn" class="btn btn-warning" disabled>⏸ Pause</button>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="recording">Recording</button>
+      <button class="tab-btn" data-tab="assertions">Assertions</button>
+      <button class="tab-btn" data-tab="network">Network</button>
+      <button class="tab-btn" data-tab="export">Export</button>
+      <button class="tab-btn" data-tab="playback">Playback</button>
+      <button class="tab-btn" data-tab="settings">Settings</button>
     </div>
 
-    <div class="status">
-      <span id="status">Ready</span>
-      <span id="actionCount">Actions: 0</span>
-    </div>
+    <!-- Recording Tab -->
+    <div class="tab-content active" id="recording">
+      <div class="controls">
+        <button id="startBtn" class="btn btn-primary">▶ Start Recording</button>
+        <button id="stopBtn" class="btn btn-danger" disabled>⏹ Stop Recording</button>
+        <button id="pauseBtn" class="btn btn-warning" disabled>⏸ Pause</button>
+      </div>
 
-    <div class="script-format">
-      <label>Export Format:</label>
-      <select id="formatSelect">
-        <option value="selenium">Selenium (Python)</option>
-        <option value="cypress">Cypress (JavaScript)</option>
-        <option value="playwright">Playwright (Python)</option>
-      </select>
-    </div>
+      <div class="status">
+        <span id="status" class="status-text">Ready</span>
+        <span id="actionCount" class="status-count">Actions: 0</span>
+        <span id="screenshotCount" class="status-count">Screenshots: 0</span>
+        <span id="networkCount" class="status-count">API Calls: 0</span>
+      </div>
 
-    <div class="actions">
-      <button id="downloadBtn" class="btn btn-secondary" disabled>📥 Download Script</button>
-      <button id="copyBtn" class="btn btn-secondary" disabled>📋 Copy to Clipboard</button>
-      <button id="clearBtn" class="btn btn-secondary" disabled>🗑 Clear</button>
-    </div>
-
-    <textarea id="scriptPreview" placeholder="Script will appear here..."></textarea>
-
-    <div class="settings">
-      <details>
-        <summary>⚙ Settings</summary>
-        <label>
-          <input type="checkbox" id="captureScreenshots"> Capture Screenshots
+      <div class="recording-options">
+        <label class="checkbox-label">
+          <input type="checkbox" id="captureScreenshots" checked> 📸 Capture Screenshots
         </label>
-        <label>
-          <input type="checkbox" id="captureNetwork"> Capture Network Requests
+        <label class="checkbox-label">
+          <input type="checkbox" id="captureNetwork" checked> 🔗 Monitor Network
         </label>
-        <label>
-          <input type="checkbox" id="recordWaits" checked> Record Wait Times
+        <label class="checkbox-label">
+          <input type="checkbox" id="recordWaits" checked> ⏱ Record Wait Times
         </label>
-      </details>
+        <label class="checkbox-label">
+          <input type="checkbox" id="recordAssertions"> ✔ Record Assertions
+        </label>
+      </div>
     </div>
 
-    <div id="notifications"></div>
+    <!-- Assertions Tab -->
+    <div class="tab-content" id="assertions">
+      <div class="assertion-controls">
+        <button id="addAssertionBtn" class="btn btn-secondary">+ Add Assertion</button>
+      </div>
+      <div id="assertionsList" class="assertions-list"></div>
+    </div>
+
+    <!-- Network Tab -->
+    <div class="tab-content" id="network">
+      <div class="network-filters">
+        <input type="text" id="networkFilter" placeholder="Filter by URL..." class="input-field">
+      </div>
+      <div id="networkList" class="network-list"></div>
+    </div>
+
+    <!-- Export Tab -->
+    <div class="tab-content" id="export">
+      <div class="export-options">
+        <label>Test Framework:</label>
+        <select id="formatSelect" class="select-field">
+          <option value="selenium-python">Selenium (Python)</option>
+          <option value="selenium-java">Selenium (Java)</option>
+          <option value="cypress">Cypress (JavaScript)</option>
+          <option value="playwright-python">Playwright (Python)</option>
+          <option value="playwright-js">Playwright (JavaScript)</option>
+          <option value="testng">TestNG (Java)</option>
+          <option value="robot">Robot Framework</option>
+          <option value="protractor">Protractor</option>
+          <option value="json">JSON (Custom)</option>
+        </select>
+      </div>
+
+      <div class="export-options">
+        <label>Include Options:</label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="includeScreenshots" checked> Screenshots
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="includeNetwork" checked> Network Calls
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="includeAssertions" checked> Assertions
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="previewBtn" class="btn btn-secondary" disabled>👁 Preview</button>
+        <button id="downloadBtn" class="btn btn-secondary" disabled>📥 Download</button>
+        <button id="copyBtn" class="btn btn-secondary" disabled>📋 Copy</button>
+      </div>
+
+      <textarea id="scriptPreview" placeholder="Script preview will appear here..."></textarea>
+    </div>
+
+    <!-- Playback Tab -->
+    <div class="tab-content" id="playback">
+      <div class="playback-controls">
+        <button id="playbackBtn" class="btn btn-primary" disabled>▶ Play Test</button>
+        <button id="stopPlaybackBtn" class="btn btn-danger" disabled>⏹ Stop</button>
+      </div>
+
+      <div class="playback-options">
+        <label>Speed:
+          <select id="playbackSpeed" class="select-field">
+            <option value="1">1x (Normal)</option>
+            <option value="2">2x (Fast)</option>
+            <option value="0.5">0.5x (Slow)</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="playbackResults" class="playback-results"></div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-content" id="settings">
+      <div class="settings-group">
+        <h3>Test Case Management</h3>
+        <label>Test Case Name:
+          <input type="text" id="testCaseName" placeholder="e.g., Login Test" class="input-field">
+        </label>
+        <label>Project/Suite:
+          <input type="text" id="projectName" placeholder="e.g., Login Suite" class="input-field">
+        </label>
+      </div>
+
+      <div class="settings-group">
+        <h3>Recording Settings</h3>
+        <label>Wait Timeout (ms):
+          <input type="number" id="waitTimeout" value="5000" class="input-field">
+        </label>
+        <label>Screenshot Quality:
+          <select id="screenshotQuality" class="select-field">
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="settings-group">
+        <h3>Test Case Actions</h3>
+        <button id="saveTestBtn" class="btn btn-secondary">💾 Save Test Case</button>
+        <button id="loadTestBtn" class="btn btn-secondary">📂 Load Test Case</button>
+        <button id="clearBtn" class="btn btn-danger">🗑 Clear All</button>
+      </div>
+
+      <div id="savedTests" class="saved-tests"></div>
+    </div>
+
+    <div id="notifications" class="notifications"></div>
   </div>
 
   <script src="popup.js"></script>

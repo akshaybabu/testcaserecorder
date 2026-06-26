@@ -1,20 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Test Recorder - Generate Test Scripts",
-  "version": "1.0.0",
-  "description": "Record user interactions and generate automated test scripts (Selenium, Cypress, Playwright)",
+  "name": "Test Recorder Pro - Advanced Test Automation",
+  "version": "2.0.0",
+  "description": "Advanced Chrome extension that records interactions and generates test scripts with assertions, screenshots, and API monitoring",
   "permissions": [
     "scripting",
     "activeTab",
     "storage",
-    "tabs"
+    "tabs",
+    "webRequest",
+    "captureVisibleTab",
+    "webNavigation"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Test Recorder"
+    "default_title": "Test Recorder Pro"
   },
   "background": {
     "service_worker": "background.js"
@@ -23,12 +26,19 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "css": ["content.css"]
+      "css": ["content.css"],
+      "all_frames": true
     }
   ],
   "icons": {
     "16": "images/icon-16.png",
     "48": "images/icon-48.png",
     "128": "images/icon-128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["inspector.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

@@ -1,120 +1,339 @@
-# Test Recorder Chrome Extension
+# Test Recorder Pro - Advanced Test Automation Extension
 
-A powerful Chrome extension that records user interactions and automatically generates test scripts in multiple formats (Selenium, Cypress, Playwright).
+## 🚀 Features
 
-## Features
+### Core Recording Features
+- ✅ **User Interaction Recording**: Capture clicks, text input, selections, and form submissions
+- ✅ **Multiple Selector Strategies**: ID, Name, CSS Class, CSS Selector, XPath, Text Content
+- ✅ **Smart Element Detection**: Intelligent selector generation for more reliable tests
+- ✅ **Visual Feedback**: Real-time highlighting of recorded elements
 
-✅ **Record User Interactions**
-- Click events
-- Text input
-- Select/dropdown changes
-- Element highlighting
+### Advanced Features
 
-✅ **Multi-Format Export**
-- Selenium (Python)
+#### 📸 Screenshot Capture
+- Auto-capture screenshots at each step
+- Visual proof of test execution
+- Integration with test documentation
+
+#### 🔗 Network Monitoring
+- Monitor all API calls (XHR, Fetch)
+- Record HTTP methods, status codes, URLs
+- Performance metrics (duration, timing)
+- Filter and view network activity
+
+#### ✔️ Test Assertions
+- Text content assertions
+- Element visibility checks
+- URL validation
+- Custom assertion recording
+- Network response assertions
+
+#### ▶️ Playback & Validation
+- Real-time test playback
+- Variable speed control (0.5x, 1x, 2x)
+- Step-by-step execution
+- Pass/Fail indication
+
+#### 💾 Test Case Management
+- Save multiple test cases
+- Organize by project/suite
+- Load and re-run saved tests
+- Version history
+- Timestamped saves
+
+#### 📥 Advanced Export Options
+
+**Frameworks Supported:**
+- Selenium (Python & Java)
 - Cypress (JavaScript)
-- Playwright (Python)
+- Playwright (Python & JavaScript)
+- TestNG (Java)
+- Robot Framework
+- Protractor
+- Custom JSON format
 
-✅ **Script Generation**
-- Automatic selector generation (ID, CSS, XPath)
-- Wait time recording
-- Clean, readable code
+**Export Options:**
+- Include/exclude screenshots
+- Include/exclude network calls
+- Include/exclude assertions
+- Formatted, production-ready code
 
-✅ **Easy Controls**
-- Start/Stop recording with one click
-- Pause/Resume functionality
-- Download or copy scripts
-- Clear recordings
+### Smart Features
+- ⏱️ **Wait Time Recording**: Automatically capture timing between actions
+- 🎯 **Selector Optimization**: Multiple selector strategies for reliability
+- 🔄 **Pause/Resume**: Pause recording without losing data
+- 📊 **Real-time Statistics**: Track actions, screenshots, API calls
+- 🎨 **Modern UI**: Tabbed interface for organized workflow
 
-## Installation
+## 📋 Installation
 
-1. Clone this repository
+1. Clone or download this repository
 2. Open `chrome://extensions/` in Chrome
-3. Enable "Developer mode" (top right)
-4. Click "Load unpacked" and select the extension folder
-5. The extension will appear in your Chrome toolbar
+3. Enable **"Developer mode"** (top-right corner)
+4. Click **"Load unpacked"**
+5. Select the extension folder
+6. Extension appears in your toolbar!
 
-## Usage
+## 🎯 Usage Guide
 
-1. Click the extension icon in your toolbar
-2. Click **"Start Recording"**
-3. Interact with your website normally
-4. Click **"Stop Recording"** when done
-5. Select your desired format (Selenium, Cypress, Playwright)
-6. Download or copy the generated script
+### Quick Start
 
-## Supported Selectors
+1. **Click the extension icon** in your toolbar
+2. **Enter test details** in Settings tab (optional)
+3. **Enable features** you want:
+   - 📸 Capture Screenshots
+   - 🔗 Monitor Network
+   - ⏱️ Record Wait Times
+   - ✔️ Record Assertions
+4. **Click "Start Recording"**
+5. **Interact with your website** normally
+6. **Click "Stop Recording"** when done
+7. **Export** in your preferred framework
 
-- **ID**: Direct ID attribute matching
-- **CSS Class**: Class-based selectors
-- **XPath**: Fallback XPath generation
+### Recording Tab
+- Start/Stop/Pause recording
+- View real-time statistics
+- Configure capture options
 
-## Settings
+### Assertions Tab
+- Add text content assertions
+- Add URL assertions
+- Add visibility checks
+- Manage all assertions in one place
 
-- **Capture Screenshots**: Save visual proof of actions
-- **Capture Network Requests**: Log API calls
-- **Record Wait Times**: Include implicit waits
+### Network Tab
+- View all API calls captured
+- Filter by URL
+- Check status codes
+- Review performance metrics
 
-## Generated Script Examples
+### Export Tab
+- **Choose Framework**: Select from 9+ frameworks
+- **Configure Options**: Include screenshots, network, assertions
+- **Preview**: See generated code before export
+- **Download**: Save as file
+- **Copy**: Copy to clipboard
+
+### Playback Tab
+- Play back recorded test
+- Control playback speed
+- View step-by-step results
+- Verify test behavior
+
+### Settings Tab
+- **Test Details**: Name and project organization
+- **Recording Settings**: Timeouts, screenshot quality
+- **Test Management**: Save/Load/Clear
+- **Saved Tests**: Manage all saved test cases
+
+## 📊 Generated Code Examples
 
 ### Selenium (Python)
 ```python
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
 
-driver = webdriver.Chrome()
-driver.get("https://example.com")
-driver.find_element(By.ID, "search-box").send_keys("test")
-driver.find_element(By.CSS_SELECTOR, ".search-btn").click()
-driver.quit()
+class TestLogin:
+    def setup_method(self):
+        self.driver = webdriver.Chrome()
+        self.wait = WebDriverWait(self.driver, 10)
+
+    def test_login_flow(self):
+        self.driver.get("https://example.com/login")
+        # Step 1: Click on email field
+        element = self.wait.until(EC.presence_of_element_located((By.ID, "email")))
+        element.click()
+        # Step 2: Type email
+        element = self.driver.find_element(By.ID, "email")
+        element.clear()
+        element.send_keys("user@example.com")
+        # Assertions
+        assert "user@example.com" in self.driver.page_source
 ```
 
-### Cypress (JavaScript)
+### Cypress
 ```javascript
-cy.visit('https://example.com')
-cy.get('#search-box').type('test')
-cy.get('.search-btn').click()
+describe('Login Suite', () => {
+  beforeEach(() => {
+    cy.visit('https://example.com/login')
+  })
+
+  it('should complete login flow', () => {
+    cy.get('#email').click()
+    cy.get('#email').type('user@example.com')
+    cy.get('#password').type('password123')
+    cy.get('button[type="submit"]').click()
+    cy.contains('Dashboard').should('exist')
+  })
+})
 ```
 
 ### Playwright (Python)
 ```python
 from playwright.sync_api import sync_playwright
 
-with sync_playwright() as p:
-    browser = p.chromium.launch()
-    page = browser.new_page()
-    page.goto('https://example.com')
-    page.fill('#search-box', 'test')
-    page.click('.search-btn')
+def test_login():
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto('https://example.com/login')
+        page.click('#email')
+        page.fill('#email', 'user@example.com')
+        page.click('button[type="submit"]')
+        assert 'Dashboard' in page.content()
+        browser.close()
 ```
 
-## Development
+## ⚙️ Configuration
 
-### Project Structure
-```
-test-recorder-extension/
-├── manifest.json          # Extension configuration
-├── popup.html/js/css      # UI controls
-├── content.js/css         # Page interaction handler
-├── background.js          # Service worker
-└── README.md             # Documentation
-```
+### Recording Options
+- **Capture Screenshots**: Toggle screenshot capture on/off
+- **Monitor Network**: Toggle API monitoring
+- **Record Wait Times**: Include timing between actions
+- **Record Assertions**: Enable assertion recording
 
-### Contributing
-Pull requests are welcome! Please ensure:
-- Code is well-commented
-- New features are tested
-- Documentation is updated
+### Export Settings
+- **Framework Selection**: Choose your test framework
+- **Code Format**: Automatically formatted and production-ready
+- **Include Options**: Select what to include in export
 
-## License
+### Performance Settings
+- **Wait Timeout**: Set default wait timeout (ms)
+- **Screenshot Quality**: High/Medium/Low
+- **Playback Speed**: 0.5x, 1x, 2x
 
-MIT License
+## 🎬 Playback Features
 
-## Future Enhancements
+- ▶️ **Play Test**: Execute recorded test steps
+- ⏸️ **Speed Control**: Adjust playback speed
+- 📊 **Results**: See pass/fail status for each step
+- 🛑 **Stop**: Stop playback at any time
 
-- 🎯 Screenshot capture with annotations
-- 🔍 Advanced element identification
-- 📊 Test execution reporting
+## 💾 Test Management
+
+- **Save Test Case**: Save with custom name
+- **Load Test Case**: Retrieve previously saved tests
+- **View History**: See saved at timestamp
+- **Delete Test**: Remove unwanted tests
+- **Organize**: Group by project/suite
+
+## 🌐 Supported Frameworks
+
+| Framework | Language | Status |
+|-----------|----------|--------|
+| Selenium | Python | ✅ Full Support |
+| Selenium | Java | ✅ Full Support |
+| Cypress | JavaScript | ✅ Full Support |
+| Playwright | Python | ✅ Full Support |
+| Playwright | JavaScript | ✅ Full Support |
+| TestNG | Java | ✅ Full Support |
+| Robot Framework | Robot | ✅ Full Support |
+| Protractor | JavaScript | ✅ Full Support |
+| Custom | JSON | ✅ Full Support |
+
+## 🔍 Selector Strategies
+
+1. **ID** - Most reliable (if available)
+2. **Name** - Attribute-based targeting
+3. **CSS Class** - Style-based selection
+4. **CSS Selector** - Generated complex selector
+5. **Text Content** - Content-based matching
+6. **XPath** - Full DOM path
+
+## 📱 Browser Compatibility
+
+- ✅ Chrome 90+
+- ✅ Edge 90+
+- ✅ Brave 1.0+
+- ✅ Opera 76+
+
+## 🐛 Troubleshooting
+
+### Recording Not Capturing
+- Ensure extension permissions are enabled
+- Refresh the page and try again
+- Check browser console for errors
+
+### Screenshot Issues
+- Verify "Capture Screenshots" is enabled
+- Check available disk space
+- Try reducing screenshot quality
+
+### Export Errors
+- Ensure test case has valid name
+- Check for special characters in framework code
+- Verify test has at least one action
+
+### Network Monitoring Not Working
+- Enable "Monitor Network" option
+- Ensure page loads external APIs
+- Check network requests in browser DevTools
+
+## 🚀 Advanced Usage
+
+### Batch Testing
+1. Record multiple test scenarios
+2. Save each with unique name
+3. Export all to same framework
+4. Run suite in your test runner
+
+### CI/CD Integration
+1. Export tests in desired framework
+2. Commit to repository
+3. Integrate with CI/CD pipeline
+4. Run on every commit
+
+### Test Maintenance
+1. Load saved test
+2. Re-record sections if needed
+3. Update assertions
+4. Save updated version
+
+## 📝 License
+
+MIT License - Feel free to use, modify, and distribute
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+- Fork the repository
+- Create feature branch
+- Commit changes
+- Push to branch
+- Create Pull Request
+
+## 📧 Support
+
+For issues, questions, or suggestions:
+- Check existing GitHub issues
+- Create new issue with details
+- Include error messages and screenshots
+
+## 🎉 Future Enhancements
+
+- 🤖 AI-powered selector optimization
+- 📸 Visual regression testing
 - 🔄 Cross-browser testing
-- 🎬 Video replay of actions
-- 🤖 AI-powered test optimization
+- 📊 Test analytics dashboard
+- 🎬 Video recording of tests
+- 🌍 Multi-language support
+- 🔐 Test encryption
+- ☁️ Cloud backup and sync
+- 👥 Team collaboration
+- 📱 Mobile testing support
+
+## 🎓 Resources
+
+- [Selenium Documentation](https://www.selenium.dev/)
+- [Cypress Documentation](https://docs.cypress.io/)
+- [Playwright Documentation](https://playwright.dev/)
+- [Robot Framework](https://robotframework.org/)
+
+---
+
+**Version**: 2.0.0  
+**Last Updated**: 2024  
+**Maintained by**: Test Recorder Pro Team
