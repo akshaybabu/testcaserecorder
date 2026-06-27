@@ -2,12 +2,13 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <title>TracePilot QA</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>Test Recorder Pro</h1>
+      <h1>TracePilot QA</h1>
       <span class="version">v2.0</span>
     </div>
     
@@ -49,6 +50,16 @@
           <input type="checkbox" id="recordAssertions"> ✔ Record Assertions
         </label>
       </div>
+
+      <div class="steps-panel">
+        <div class="section-header">
+          <h3>Recorded Steps</h3>
+          <span class="section-caption">Live action log</span>
+        </div>
+        <div id="recordedStepsList" class="recorded-steps-list">
+          <div class="empty-state">Recorded steps will appear here as you interact with the page.</div>
+        </div>
+      </div>
     </div>
 
     <!-- Assertions Tab -->
@@ -70,7 +81,7 @@
     <!-- Export Tab -->
     <div class="tab-content" id="export">
       <div class="export-options">
-        <label>Test Framework:</label>
+        <label>Export Format:</label>
         <select id="formatSelect" class="select-field">
           <option value="selenium-python">Selenium (Python)</option>
           <option value="selenium-java">Selenium (Java)</option>
@@ -80,6 +91,7 @@
           <option value="testng">TestNG (Java)</option>
           <option value="robot">Robot Framework</option>
           <option value="protractor">Protractor</option>
+          <option value="excel">Excel Workbook</option>
           <option value="json">JSON (Custom)</option>
         </select>
       </div>

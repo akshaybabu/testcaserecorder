@@ -35,6 +35,8 @@ const screenshotCountEl = document.getElementById('screenshotCount');
 const networkCountEl = document.getElementById('networkCount');
 const scriptPreview = document.getElementById('scriptPreview');
 const notifications = document.getElementById('notifications');
+const recordedStepsList = document.getElementById('recordedStepsList');
+const networkList = document.getElementById('networkList');
 
 // Assertion controls
 const addAssertionBtn = document.getElementById('addAssertionBtn');
@@ -65,55 +67,346 @@ playbackBtn.addEventListener('click', playbackTest);
 stopPlaybackBtn.addEventListener('click', stopPlayback);
 saveTestBtn.addEventListener('click', saveTestCase);
 loadTestBtn.addEventListener('click', loadTestCase);
-
-async function startRecording() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  currentTabId = tab.id;
-
-  isRecording = true;
-  recordedActions = [];
-  recordedAssertions = [];
-  networkRequests = [];
-  screenshots = [];
-
-  chrome.tabs.sendMessage(currentTabId, {
-    action: 'startRecording',
-    options: {
-      captureScreenshots: document.getElementById('captureScreenshots').checked,
-      captureNetwork: document.getElementById('captureNetwork').checked,
-      recordWaits: document.getElementById('recordWaits').checked,
-      recordAssertions: document.getElementById('recordAssertions').checked
+['includeScreenshots', 'includeNetwork', 'includeAssertions'].forEach((id) => {
+  document.getElementById(id)?.addEventListener('change', () => {
+    if (scriptPreview.value) {
+      updatePreview();
     }
   });
+});
 
-  updateUI();
-  showNotification('🔴 Recording started!');
+function sendRuntimeMessage(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve(response);
+    });
+  });
 }
 
-function stopRecording() {
+function sendTabMessage(tabId, message) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve(response);
+    });
+  });
+}
+
+function isRestrictedRecordingUrl(url = '') {
+  return /^(chrome|edge|about|brave|vivaldi|opera):\/\//i.test(url)
+    || /^chrome-extension:\/\//i.test(url)
+    || /^https:\/\/chromewebstore\.google\.com/i.test(url);
+}
+
+function insertContentScript(tabId) {
+  return new Promise((resolve, reject) => {
+    chrome.scripting.executeScript(
+      {
+        target: { tabId, allFrames: true },
+        files: ['content.js']
+      },
+      () => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+
+        resolve();
+      }
+    );
+  });
+}
+
+function insertContentStyles(tabId) {
+  return new Promise((resolve, reject) => {
+    chrome.scripting.insertCSS(
+      {
+        target: { tabId, allFrames: true },
+        files: ['content.css']
+      },
+      () => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+
+        resolve();
+      }
+    );
+  });
+}
+
+async function ensureRecorderReady(tab) {
+  if (!tab?.id) {
+    throw new Error('No active browser tab is available for recording.');
+  }
+
+  if (isRestrictedRecordingUrl(tab.url || '')) {
+    throw new Error('Recording is not available on browser internal pages. Open a regular website and try again.');
+  }
+
+  try {
+    await sendTabMessage(tab.id, { action: 'ping' });
+    return;
+  } catch (error) {
+    if (!error.message.includes('Receiving end does not exist')) {
+      throw error;
+    }
+  }
+
+  await insertContentStyles(tab.id);
+  await insertContentScript(tab.id);
+  await sendTabMessage(tab.id, { action: 'ping' });
+}
+
+async function loadRecordingSession() {
+  try {
+    const response = await sendRuntimeMessage({ action: 'getRecordingSession' });
+    if (response?.data) {
+      applyRecordingSession(response.data);
+    } else {
+      updateUI();
+    }
+  } catch (error) {
+    console.warn('Unable to load recording session:', error);
+    updateUI();
+  }
+}
+
+function applyRecordingSession(session = {}) {
+  recordedActions = session.actions || [];
+  recordedAssertions = session.assertions || [];
+  networkRequests = session.networkRequests || [];
+  screenshots = session.screenshots || [];
+  isRecording = Boolean(session.isRecording);
+  isPaused = Boolean(session.isPaused);
+  currentTabId = session.currentTabId || null;
+  updateUI();
+}
+
+async function persistRecordingSession(overrides = {}) {
+  try {
+    await sendRuntimeMessage({
+      action: 'setRecordingSession',
+      data: {
+        actions: recordedActions,
+        assertions: recordedAssertions,
+        networkRequests,
+        screenshots,
+        isRecording,
+        isPaused,
+        currentTabId,
+        ...overrides
+      }
+    });
+  } catch (error) {
+    console.warn('Unable to persist recording session:', error);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatActionSummary(action) {
+  const selector = action?.displayName || action?.selector?.value || 'Unknown element';
+
+  switch (action?.type) {
+    case 'click':
+      return `Click ${selector}`;
+    case 'type':
+      return `Type "${action.value || ''}" into ${selector}`;
+    case 'change':
+      return `Change ${selector} to "${action.value || ''}"`;
+    case 'submit':
+      return `Submit form ${selector}`;
+    case 'dragDrop':
+      return `Drag ${selector} to ${action.targetDisplayName || action.targetSelector?.value || 'drop target'}`;
+    case 'wait':
+      return `Wait ${action.duration || 0}ms`;
+    default:
+      return `${action?.type || 'step'} on ${selector}`;
+  }
+}
+
+function formatActionMeta(action) {
+  const strategy = action?.selector?.strategy ? `${action.selector.strategy}: ` : '';
+  const location = action?.url ? ` • ${action.url}` : '';
+  return `${strategy}${action?.selector?.value || ''}${location}`.trim();
+}
+
+function formatAlternativeLocators(action) {
+  const locators = Array.isArray(action?.alternativeLocators) ? action.alternativeLocators : [];
+  return locators
+    .slice(0, 5)
+    .map((locator) => `${locator.type || locator.strategy}: ${locator.value}`)
+    .join('\n');
+}
+
+function renderLocatorChips(action) {
+  const locators = Array.isArray(action?.alternativeLocators) ? action.alternativeLocators : [];
+  if (!locators.length) {
+    return '';
+  }
+
+  return `
+    <div class="locator-chip-row">
+      ${locators.slice(0, 3).map((locator) => (
+        `<span class="locator-chip" title="${escapeHtml(locator.value)}">${escapeHtml(locator.type || locator.strategy)} ${escapeHtml(locator.confidence || '')}</span>`
+      )).join('')}
+    </div>
+  `;
+}
+
+function renderRecordedActions() {
+  recordedStepsList.innerHTML = '';
+
+  if (!recordedActions.length) {
+    recordedStepsList.innerHTML = '<div class="empty-state">Recorded steps will appear here as you interact with the page.</div>';
+    return;
+  }
+
+  recordedActions.forEach((action, index) => {
+    const item = document.createElement('div');
+    item.className = 'recorded-step-item';
+    const previewMarkup = action.previewDataUrl
+      ? `<img class="step-preview-image" src="${escapeHtml(action.previewDataUrl)}" alt="${escapeHtml(action.displayName || 'Step preview')}">`
+      : '';
+    item.innerHTML = `
+      <div class="item-header">
+        <strong>Step ${index + 1}</strong>
+        <span class="item-badge">${escapeHtml((action.type || 'step').toUpperCase())}</span>
+      </div>
+      <div class="step-body">
+        ${previewMarkup}
+        <div class="step-copy">
+          <div class="step-summary">${escapeHtml(formatActionSummary(action))}</div>
+          <div class="step-meta">${escapeHtml(formatActionMeta(action))}</div>
+          ${renderLocatorChips(action)}
+        </div>
+      </div>
+    `;
+    recordedStepsList.appendChild(item);
+  });
+
+  recordedStepsList.scrollTop = recordedStepsList.scrollHeight;
+}
+
+function renderNetworkList() {
+  networkList.innerHTML = '';
+
+  if (!networkRequests.length) {
+    networkList.innerHTML = '<div class="empty-state">Captured API calls will appear here while recording.</div>';
+    return;
+  }
+
+  networkRequests.forEach((call) => addNetworkItem(call));
+}
+
+async function startRecording() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab?.id) {
+      showNotification('No active browser tab is available for recording.', 'error');
+      return;
+    }
+
+    await ensureRecorderReady(tab);
+
+    currentTabId = tab.id;
+    isRecording = true;
+    isPaused = false;
+    recordedActions = [];
+    recordedAssertions = [];
+    networkRequests = [];
+    screenshots = [];
+    updateUI();
+
+    await sendRuntimeMessage({
+      action: 'startRecordingSession',
+      data: { currentTabId }
+    });
+
+    await sendTabMessage(currentTabId, {
+      action: 'startRecording',
+      options: {
+        captureScreenshots: document.getElementById('captureScreenshots').checked,
+        captureNetwork: document.getElementById('captureNetwork').checked,
+        recordWaits: document.getElementById('recordWaits').checked,
+        recordAssertions: document.getElementById('recordAssertions').checked
+      }
+    });
+
+  showNotification('🔴 Recording started!');
+  } catch (error) {
+    isRecording = false;
+    isPaused = false;
+    currentTabId = null;
+    updateUI();
+    showNotification(`Unable to start recording: ${error.message}`, 'error');
+  }
+}
+
+async function stopRecording() {
   isRecording = false;
-  chrome.tabs.sendMessage(currentTabId, { action: 'stopRecording' });
+  isPaused = false;
+
+  if (currentTabId) {
+    try {
+      await sendTabMessage(currentTabId, { action: 'stopRecording' });
+    } catch (error) {
+      console.warn('Unable to notify content script to stop recording:', error);
+    }
+  }
+
+  await sendRuntimeMessage({ action: 'stopRecordingSession' });
   updateUI();
   updatePreview();
   showNotification('⏹ Recording stopped!', 'success');
 }
 
-function togglePause() {
+async function togglePause() {
   isPaused = !isPaused;
-  pauseBtn.textContent = isPaused ? '▶ Resume' : '⏸ Pause';
-  statusEl.textContent = isPaused ? 'Paused' : 'Recording';
-  chrome.tabs.sendMessage(currentTabId, { action: isPaused ? 'pauseRecording' : 'resumeRecording' });
+  updateUI();
+
+  if (currentTabId) {
+    try {
+      await sendTabMessage(currentTabId, { action: isPaused ? 'pauseRecording' : 'resumeRecording' });
+    } catch (error) {
+      console.warn('Unable to notify content script about pause state:', error);
+    }
+  }
+
+  await sendRuntimeMessage({ action: isPaused ? 'pauseRecordingSession' : 'resumeRecordingSession' });
 }
 
-function clearRecording() {
+async function clearRecording() {
   if (confirm('Clear all recorded actions? This cannot be undone.')) {
+    isRecording = false;
+    isPaused = false;
+    currentTabId = null;
     recordedActions = [];
     recordedAssertions = [];
     networkRequests = [];
     screenshots = [];
     scriptPreview.value = '';
     assertionsList.innerHTML = '';
-    document.getElementById('networkList').innerHTML = '';
+    await sendRuntimeMessage({ action: 'clearRecordingSession' });
     updateUI();
     showNotification('✓ Recording cleared!', 'success');
   }
@@ -144,10 +437,466 @@ function previewScript() {
   showNotification('✓ Preview updated!', 'success');
 }
 
+function getExportPayload() {
+  return {
+    actions: recordedActions,
+    assertions: document.getElementById('includeAssertions').checked ? recordedAssertions : [],
+    networkCalls: document.getElementById('includeNetwork').checked ? networkRequests : [],
+    screenshots: document.getElementById('includeScreenshots').checked ? screenshots : []
+  };
+}
+
+function getExportFileBaseName() {
+  return testCaseNameInput.value?.replace(/\s+/g, '_') || 'test_script';
+}
+
+function formatExportTimestamp(timestamp) {
+  if (!timestamp) {
+    return '';
+  }
+
+  return new Date(timestamp).toLocaleString();
+}
+
 function updatePreview() {
   const format = formatSelect.value;
-  const script = generateScript(format, recordedActions, recordedAssertions, networkRequests);
+  const payload = getExportPayload();
+
+  if (format === 'excel') {
+    scriptPreview.value = generateExcelPreview(payload);
+    return;
+  }
+
+  const script = generateScript(
+    format,
+    payload.actions,
+    payload.assertions,
+    payload.networkCalls
+  );
   scriptPreview.value = script;
+}
+
+function generateExcelPreview(payload) {
+  const sections = [
+    `Workbook: ${testCaseNameInput.value || 'Recorded Test'}`,
+    `Project: ${projectNameInput.value || 'Default'}`,
+    `Actions: ${payload.actions.length}`,
+    `Assertions: ${payload.assertions.length}`,
+    `Network Calls: ${payload.networkCalls.length}`,
+    `Screenshots: ${payload.screenshots.length}`,
+    '',
+    'Sheets:',
+    '- Summary',
+    '- Actions'
+  ];
+
+  if (payload.assertions.length) {
+    sections.push('- Assertions');
+  }
+
+  if (payload.networkCalls.length) {
+    sections.push('- Network');
+  }
+
+  if (payload.screenshots.length) {
+    sections.push('- Screenshots');
+  }
+
+  if (payload.actions.length) {
+    sections.push('');
+    sections.push('First Actions Preview:');
+    payload.actions.slice(0, 5).forEach((action, index) => {
+      sections.push(
+        `${index + 1}. ${action.type || 'step'} | ${action.selector?.value || ''} | ${formatExportTimestamp(action.timestamp)}`
+      );
+    });
+  }
+
+  return sections.join('\n');
+}
+
+function escapeXml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function getExcelCellType(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? 'Number' : 'String';
+}
+
+function createWorksheetXml(name, headers, rows) {
+  const headerCells = headers.map((header) => (
+    `<Cell ss:StyleID="header"><Data ss:Type="String">${escapeXml(header)}</Data></Cell>`
+  )).join('');
+
+  const rowXml = rows.map((row) => {
+    const cells = row.map((cell) => (
+      `<Cell><Data ss:Type="${getExcelCellType(cell)}">${escapeXml(cell)}</Data></Cell>`
+    )).join('');
+    return `<Row>${cells}</Row>`;
+  }).join('');
+
+  return `
+    <Worksheet ss:Name="${escapeXml(name)}">
+      <Table>
+        <Row>${headerCells}</Row>
+        ${rowXml}
+      </Table>
+    </Worksheet>
+  `;
+}
+
+function buildExcelWorkbookXml(payload) {
+  const worksheets = [];
+
+  worksheets.push(createWorksheetXml(
+    'Summary',
+    ['Field', 'Value'],
+    [
+      ['Test Case', testCaseNameInput.value || 'Recorded Test'],
+      ['Project', projectNameInput.value || 'Default'],
+      ['Exported At', new Date().toLocaleString()],
+      ['Actions', payload.actions.length],
+      ['Assertions', payload.assertions.length],
+      ['Network Calls', payload.networkCalls.length],
+      ['Screenshots', payload.screenshots.length]
+    ]
+  ));
+
+  worksheets.push(createWorksheetXml(
+    'Actions',
+    ['Step', 'Type', 'Selector Strategy', 'Selector Value', 'Value', 'Input Type', 'Tag', 'URL', 'Timestamp'],
+    payload.actions.map((action, index) => ([
+      index + 1,
+      action.type || '',
+      action.selector?.strategy || '',
+      action.selector?.value || '',
+      action.value || '',
+      action.inputType || '',
+      action.tagName || '',
+      action.url || '',
+      formatExportTimestamp(action.timestamp)
+    ]))
+  ));
+
+  if (payload.assertions.length) {
+    worksheets.push(createWorksheetXml(
+      'Assertions',
+      ['#', 'Type', 'Value'],
+      payload.assertions.map((assertion, index) => ([
+        index + 1,
+        assertion.type || '',
+        assertion.value || ''
+      ]))
+    ));
+  }
+
+  if (payload.networkCalls.length) {
+    worksheets.push(createWorksheetXml(
+      'Network',
+      ['#', 'Method', 'URL', 'Status', 'Duration (ms)', 'Error', 'Timestamp'],
+      payload.networkCalls.map((call, index) => ([
+        index + 1,
+        call.method || '',
+        call.url || '',
+        call.status ?? '',
+        call.duration ?? '',
+        call.error || '',
+        formatExportTimestamp(call.timestamp)
+      ]))
+    ));
+  }
+
+  if (payload.screenshots.length) {
+    worksheets.push(createWorksheetXml(
+      'Screenshots',
+      ['#', 'URL', 'Timestamp'],
+      payload.screenshots.map((shot, index) => ([
+        index + 1,
+        shot.url || '',
+        formatExportTimestamp(shot.timestamp)
+      ]))
+    ));
+  }
+
+  return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook
+  xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:x="urn:schemas-microsoft-com:office:excel"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Styles>
+    <Style ss:ID="header">
+      <Font ss:Bold="1"/>
+      <Interior ss:Color="#E5E7EB" ss:Pattern="Solid"/>
+    </Style>
+  </Styles>
+  ${worksheets.join('\n')}
+</Workbook>`;
+}
+
+function getExcelColumnName(index) {
+  let column = '';
+  let current = index + 1;
+
+  while (current > 0) {
+    const remainder = (current - 1) % 26;
+    column = String.fromCharCode(65 + remainder) + column;
+    current = Math.floor((current - 1) / 26);
+  }
+
+  return column;
+}
+
+function createXlsxSheetXml(headers, rows) {
+  const allRows = [headers, ...rows];
+  const rowXml = allRows.map((row, rowIndex) => {
+    const cells = row.map((cell, columnIndex) => {
+      const address = `${getExcelColumnName(columnIndex)}${rowIndex + 1}`;
+      const value = escapeXml(cell);
+      return `<c r="${address}" t="inlineStr"><is><t>${value}</t></is></c>`;
+    }).join('');
+    return `<row r="${rowIndex + 1}">${cells}</row>`;
+  }).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>${rowXml}</sheetData>
+</worksheet>`;
+}
+
+function buildXlsxSheets(payload) {
+  const sheets = [
+    {
+      name: 'Summary',
+      headers: ['Field', 'Value'],
+      rows: [
+        ['Test Case', testCaseNameInput.value || 'Recorded Test'],
+        ['Project', projectNameInput.value || 'Default'],
+        ['Exported At', new Date().toLocaleString()],
+        ['Actions', payload.actions.length],
+        ['Assertions', payload.assertions.length],
+        ['Network Calls', payload.networkCalls.length],
+        ['Screenshots', payload.screenshots.length]
+      ]
+    },
+    {
+      name: 'Actions',
+      headers: ['Step', 'Action', 'Business Label', 'Primary Strategy', 'Primary Locator', 'Alternative Locators', 'Target Label', 'Target Locator', 'Value', 'Initial Value', 'Input Type', 'Commit Trigger', 'Tag', 'URL', 'Timestamp'],
+      rows: payload.actions.map((action, index) => ([
+        index + 1,
+        action.type || '',
+        action.displayName || '',
+        action.selector?.strategy || '',
+        action.selector?.value || '',
+        formatAlternativeLocators(action),
+        action.targetDisplayName || '',
+        action.targetSelector?.value || '',
+        action.value || '',
+        action.initialValue || '',
+        action.inputType || '',
+        action.inputCommit || '',
+        action.tagName || '',
+        action.url || '',
+        formatExportTimestamp(action.timestamp)
+      ]))
+    }
+  ];
+
+  if (payload.assertions.length) {
+    sheets.push({
+      name: 'Assertions',
+      headers: ['#', 'Type', 'Value'],
+      rows: payload.assertions.map((assertion, index) => ([
+        index + 1,
+        assertion.type || '',
+        assertion.value || ''
+      ]))
+    });
+  }
+
+  if (payload.networkCalls.length) {
+    sheets.push({
+      name: 'Network',
+      headers: ['#', 'Method', 'URL', 'Status', 'Duration (ms)', 'Error', 'Timestamp'],
+      rows: payload.networkCalls.map((call, index) => ([
+        index + 1,
+        call.method || '',
+        call.url || '',
+        call.status ?? '',
+        call.duration ?? '',
+        call.error || '',
+        formatExportTimestamp(call.timestamp)
+      ]))
+    });
+  }
+
+  if (payload.screenshots.length) {
+    sheets.push({
+      name: 'Screenshots',
+      headers: ['#', 'URL', 'Timestamp'],
+      rows: payload.screenshots.map((shot, index) => ([
+        index + 1,
+        shot.url || '',
+        formatExportTimestamp(shot.timestamp)
+      ]))
+    });
+  }
+
+  return sheets;
+}
+
+function createCrc32Table() {
+  const table = [];
+  for (let i = 0; i < 256; i++) {
+    let value = i;
+    for (let j = 0; j < 8; j++) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[i] = value >>> 0;
+  }
+  return table;
+}
+
+const crc32Table = createCrc32Table();
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc = crc32Table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function writeUint16(buffer, offset, value) {
+  buffer[offset] = value & 0xff;
+  buffer[offset + 1] = (value >>> 8) & 0xff;
+}
+
+function writeUint32(buffer, offset, value) {
+  buffer[offset] = value & 0xff;
+  buffer[offset + 1] = (value >>> 8) & 0xff;
+  buffer[offset + 2] = (value >>> 16) & 0xff;
+  buffer[offset + 3] = (value >>> 24) & 0xff;
+}
+
+function concatUint8Arrays(parts) {
+  const totalLength = parts.reduce((total, part) => total + part.length, 0);
+  const output = new Uint8Array(totalLength);
+  let offset = 0;
+
+  parts.forEach((part) => {
+    output.set(part, offset);
+    offset += part.length;
+  });
+
+  return output;
+}
+
+function createZipArchive(entries) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  entries.forEach((entry) => {
+    const nameBytes = encoder.encode(entry.name);
+    const dataBytes = typeof entry.content === 'string' ? encoder.encode(entry.content) : entry.content;
+    const checksum = crc32(dataBytes);
+
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    writeUint32(localHeader, 0, 0x04034b50);
+    writeUint16(localHeader, 4, 20);
+    writeUint16(localHeader, 8, 0);
+    writeUint32(localHeader, 14, checksum);
+    writeUint32(localHeader, 18, dataBytes.length);
+    writeUint32(localHeader, 22, dataBytes.length);
+    writeUint16(localHeader, 26, nameBytes.length);
+    localHeader.set(nameBytes, 30);
+    localParts.push(localHeader, dataBytes);
+
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    writeUint32(centralHeader, 0, 0x02014b50);
+    writeUint16(centralHeader, 4, 20);
+    writeUint16(centralHeader, 6, 20);
+    writeUint32(centralHeader, 16, checksum);
+    writeUint32(centralHeader, 20, dataBytes.length);
+    writeUint32(centralHeader, 24, dataBytes.length);
+    writeUint16(centralHeader, 28, nameBytes.length);
+    writeUint32(centralHeader, 42, offset);
+    centralHeader.set(nameBytes, 46);
+    centralParts.push(centralHeader);
+
+    offset += localHeader.length + dataBytes.length;
+  });
+
+  const centralDirectory = concatUint8Arrays(centralParts);
+  const endRecord = new Uint8Array(22);
+  writeUint32(endRecord, 0, 0x06054b50);
+  writeUint16(endRecord, 8, entries.length);
+  writeUint16(endRecord, 10, entries.length);
+  writeUint32(endRecord, 12, centralDirectory.length);
+  writeUint32(endRecord, 16, offset);
+
+  return concatUint8Arrays([...localParts, centralDirectory, endRecord]);
+}
+
+function buildXlsxWorkbook(payload) {
+  const sheets = buildXlsxSheets(payload);
+  const sheetDefs = sheets.map((sheet, index) => (
+    `<sheet name="${escapeXml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`
+  )).join('');
+  const workbookRels = sheets.map((sheet, index) => (
+    `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`
+  )).join('');
+  const worksheetOverrides = sheets.map((sheet, index) => (
+    `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`
+  )).join('');
+
+  const entries = [
+    {
+      name: '[Content_Types].xml',
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  ${worksheetOverrides}
+</Types>`
+    },
+    {
+      name: '_rels/.rels',
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`
+    },
+    {
+      name: 'xl/workbook.xml',
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>${sheetDefs}</sheets>
+</workbook>`
+    },
+    {
+      name: 'xl/_rels/workbook.xml.rels',
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${workbookRels}
+</Relationships>`
+    },
+    ...sheets.map((sheet, index) => ({
+      name: `xl/worksheets/sheet${index + 1}.xml`,
+      content: createXlsxSheetXml(sheet.headers, sheet.rows)
+    }))
+  ];
+
+  return createZipArchive(entries);
 }
 
 function generateScript(format, actions, assertions, networkCalls) {
@@ -590,11 +1339,27 @@ describe('${projectNameInput.value || 'Test Suite'}', function() {
 
 function downloadScript() {
   const format = formatSelect.value;
-  const script = scriptPreview.value;
-  const ext = format === 'cypress' || format === 'playwright-js' || format === 'protractor' ? 'js' : format === 'robot' ? 'robot' : format === 'json' ? 'json' : 'py';
-  const filename = `${testCaseNameInput.value?.replace(/\s+/g, '_') || 'test_script'}.${ext}`;
+  const payload = getExportPayload();
+  const baseName = getExportFileBaseName();
+  const ext = format === 'excel'
+    ? 'xlsx'
+    : format === 'cypress' || format === 'playwright-js' || format === 'protractor'
+      ? 'js'
+      : format === 'robot'
+        ? 'robot'
+        : format === 'json'
+          ? 'json'
+          : 'py';
+  const filename = `${baseName}.${ext}`;
 
-  const blob = new Blob([script], { type: 'text/plain' });
+  const fileContents = format === 'excel'
+    ? buildXlsxWorkbook(payload)
+    : scriptPreview.value;
+  const mimeType = format === 'excel'
+    ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    : 'text/plain';
+
+  const blob = new Blob([fileContents], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -617,6 +1382,11 @@ async function playbackTest() {
     return;
   }
 
+  if (isRecording) {
+    showNotification('Stop recording before playback so replay does not create new steps.', 'warning');
+    return;
+  }
+
   isPlaying = true;
   playbackBtn.disabled = true;
   stopPlaybackBtn.disabled = false;
@@ -624,6 +1394,51 @@ async function playbackTest() {
 
   const speed = parseFloat(document.getElementById('playbackSpeed').value);
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  try {
+    await ensureRecorderReady(tab);
+
+    for (let i = 0; i < recordedActions.length && isPlaying; i++) {
+      const action = recordedActions[i];
+      const delay = 700 / (speed || 1);
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      if (!isPlaying) break;
+
+      const response = await sendTabMessage(tab.id, {
+        action: 'executePlaybackAction',
+        data: {
+          action,
+          timeoutMs: Number(document.getElementById('waitTimeout')?.value || 5000)
+        }
+      });
+
+      if (!response?.success) {
+        addPlaybackResult(action, i + 1, 'fail', response?.error || 'Step failed during playback.');
+        showNotification(`Playback failed at step ${i + 1}`, 'error');
+        isPlaying = false;
+        break;
+      }
+
+      const locatorUsed = response.data?.locatorUsed
+        ? ` using ${response.data.locatorUsed.type || response.data.locatorUsed.strategy}`
+        : '';
+      addPlaybackResult(action, i + 1, 'pass', `${formatActionSummary(action)}${locatorUsed}`);
+    }
+
+    if (isPlaying) {
+      addPlaybackResult(null, recordedActions.length, 'pass', 'Playback completed.');
+      showNotification('Playback completed successfully.', 'success');
+    }
+  } catch (error) {
+    addPlaybackResult(null, 0, 'fail', `Playback could not start: ${error.message}`);
+    showNotification(`Playback could not start: ${error.message}`, 'error');
+  } finally {
+    playbackBtn.disabled = !recordedActions.length;
+    stopPlaybackBtn.disabled = true;
+    isPlaying = false;
+  }
+  return;
 
   for (let i = 0; i < recordedActions.length && isPlaying; i++) {
     const action = recordedActions[i];
@@ -651,7 +1466,7 @@ function stopPlayback() {
 function addPlaybackResult(action, stepNum, status, message = '') {
   const result = document.createElement('div');
   result.className = `playback-item ${status}`;
-  result.innerHTML = `<strong>Step ${stepNum}:</strong> ${message || (action?.type?.toUpperCase() + ' - ' + action?.selector?.value)}`;
+  result.innerHTML = `<strong>Step ${stepNum}:</strong> ${escapeHtml(message || (action?.type?.toUpperCase() + ' - ' + action?.selector?.value))}`;
   playbackResults.appendChild(result);
   playbackResults.scrollTop = playbackResults.scrollHeight;
 }
@@ -710,14 +1525,18 @@ window.loadTest = function(name) {
   chrome.storage.local.get('savedTestCases', (result) => {
     const testCase = result.savedTestCases[name];
     if (testCase) {
-      recordedActions = testCase.actions;
-      recordedAssertions = testCase.assertions;
-      networkRequests = testCase.networkRequests;
-      screenshots = testCase.screenshots;
+      recordedActions = testCase.actions || [];
+      recordedAssertions = testCase.assertions || [];
+      networkRequests = testCase.networkRequests || [];
+      screenshots = testCase.screenshots || [];
+      isRecording = false;
+      isPaused = false;
+      currentTabId = null;
       testCaseNameInput.value = testCase.name;
       projectNameInput.value = testCase.project;
       updateUI();
       updatePreview();
+      persistRecordingSession();
       showNotification(`✓ Test case '${name}' loaded!`, 'success');
     }
   });
@@ -747,15 +1566,18 @@ function updateUI() {
   startBtn.disabled = isRecording;
   stopBtn.disabled = !isRecording;
   pauseBtn.disabled = !isRecording;
+  pauseBtn.textContent = isPaused ? '▶ Resume' : '⏸ Pause';
   downloadBtn.disabled = !recordedActions.length;
   copyBtn.disabled = !recordedActions.length;
   previewBtn.disabled = !recordedActions.length;
   playbackBtn.disabled = !recordedActions.length;
 
-  statusEl.textContent = isRecording ? 'Recording' : 'Ready';
+  statusEl.textContent = isPaused ? 'Paused' : isRecording ? 'Recording' : 'Ready';
   actionCountEl.textContent = `Actions: ${recordedActions.length}`;
   screenshotCountEl.textContent = `Screenshots: ${screenshots.length}`;
   networkCountEl.textContent = `API Calls: ${networkRequests.length}`;
+  renderRecordedActions();
+  renderNetworkList();
 }
 
 function showNotification(message, type = 'info') {
@@ -767,26 +1589,23 @@ function showNotification(message, type = 'info') {
   setTimeout(() => notif.remove(), 3000);
 }
 
-// Listen for messages from content script
+// Listen for updates from background storage sync
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'recordAction') {
-    recordedActions.push(request.data);
-    updateUI();
-    sendResponse({ success: true });
-  } else if (request.action === 'recordScreenshot') {
-    screenshots.push(request.data);
-    screenshotCountEl.textContent = `Screenshots: ${screenshots.length}`;
-    sendResponse({ success: true });
-  } else if (request.action === 'recordNetworkCall') {
-    networkRequests.push(request.data);
-    networkCountEl.textContent = `API Calls: ${networkRequests.length}`;
-    addNetworkItem(request.data);
+  if (request.action !== 'recordingSessionUpdated') {
+    return;
+  }
+
+  applyRecordingSession(request.data || {});
+  if (scriptPreview.value) {
+    updatePreview();
+  }
+
+  if (sendResponse) {
     sendResponse({ success: true });
   }
 });
 
 function addNetworkItem(call) {
-  const networkList = document.getElementById('networkList');
   const item = document.createElement('div');
   item.className = 'network-item';
   item.innerHTML = `
@@ -801,6 +1620,10 @@ function addNetworkItem(call) {
   networkList.scrollTop = networkList.scrollHeight;
 }
 
-// Load saved tests on popup open
-loadSavedTests();
-updateUI();
+async function initializePopup() {
+  await loadRecordingSession();
+  loadSavedTests();
+  updateUI();
+}
+
+initializePopup();
