@@ -1,0 +1,40 @@
+name: Build Extension Zip
+
+on:
+  push:
+    branches:
+      - 'pr-*'
+      - 'pr_*'
+      - 'pr/**'
+
+jobs:
+  build-zip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build obfuscated extension
+        run: npm run build
+
+      - name: Create zip archive
+        run: |
+          cd build/dist
+          zip -r ../AS-Web-Recorder.zip .
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AS-Web-Recorder-${{ github.ref_name }}
+          path: build/AS-Web-Recorder.zip
+          if-no-files-found: error

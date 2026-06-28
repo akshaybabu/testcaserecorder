@@ -10,9 +10,15 @@ let latestSession = {
   screenshots: []
 };
 let activeDragSource = null;
+let inspectorEnabled = false;
+let inspectorPinned = true;
+let hoveredInspectorElement = null;
+let selectedInspectorData = null;
+let inspectorDragState = null;
 const pendingInputRecords = new Map();
 const isTopFrame = window.top === window;
 const OVERLAY_ID = 'test-recorder-indicator';
+const INSPECTOR_PANEL_ID = 'as-live-inspector-panel';
 const OVERLAY_STEP_LIMIT = 6;
 const inputFlushPromises = new Map();
 
@@ -44,6 +50,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === 'recordingSessionUpdated') {
     applySessionUpdate(request.data || {});
     sendResponse({ success: true });
+  } else if (request.action === 'startInspector') {
+    startInspectorMode();
+    sendResponse({ success: true, data: selectedInspectorData });
+  } else if (request.action === 'stopInspector') {
+    stopInspectorMode();
+    sendResponse({ success: true });
+  } else if (request.action === 'getPageContext') {
+    sendResponse({
+      success: true,
+      data: {
+        title: document.title,
+        url: window.location.href,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        }
+      }
+    });
   }
 });
 
@@ -601,7 +625,7 @@ function applySessionUpdate(session) {
 }
 
 function isRecorderUiElement(target) {
-  return target instanceof Element && Boolean(target.closest(`#${OVERLAY_ID}`));
+  return target instanceof Element && Boolean(target.closest(`#${OVERLAY_ID}, #${INSPECTOR_PANEL_ID}`));
 }
 
 function formatOverlayStep(action, index) {
@@ -1353,6 +1377,287 @@ function updateRecordingOverlay(session = latestSession) {
   }).join('');
 
   stepsEl.scrollTop = stepsEl.scrollHeight;
+}
+
+function buildInspectorSelection(element) {
+  const css = generateCSSSelector(element) || '';
+  const xpath = getXPath(element) || '';
+  const descriptor = getElementDescriptor(element);
+  const summary = `${element.tagName.toLowerCase()} • ${descriptor}`;
+  const cssLocator = css || (element.id ? `#${element.id}` : '');
+  const playwright = cssLocator
+    ? `page.locator('${cssLocator.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`
+    : `page.locator('xpath=${xpath.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
+  const cypress = cssLocator
+    ? `cy.get('${cssLocator.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`
+    : `cy.xpath('${xpath.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
+  const selenium = cssLocator
+    ? `By.cssSelector("${cssLocator.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`
+    : `By.xpath("${xpath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
+
+  return {
+    descriptor,
+    tagName: element.tagName.toLowerCase(),
+    summary,
+    url: window.location.href,
+    css: cssLocator,
+    xpath,
+    playwright,
+    cypress,
+    selenium
+  };
+}
+
+function ensureInspectorPanel() {
+  if (!isTopFrame) {
+    return null;
+  }
+
+  let panel = document.getElementById(INSPECTOR_PANEL_ID);
+  if (panel) {
+    return panel;
+  }
+
+  panel = document.createElement('aside');
+  panel.id = INSPECTOR_PANEL_ID;
+  panel.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: min(360px, calc(100vw - 24px));
+    z-index: 1000001;
+    border-radius: 22px;
+    border: 1px solid rgba(138, 113, 76, 0.18);
+    background: rgba(255, 252, 247, 0.96);
+    color: #221f1a;
+    box-shadow: 0 22px 56px rgba(72, 49, 26, 0.22);
+    font-family: "Segoe UI", sans-serif;
+    overflow: hidden;
+  `;
+  document.body.appendChild(panel);
+  return panel;
+}
+
+function getInspectorBounds(panel) {
+  const rect = panel.getBoundingClientRect();
+  return {
+    width: rect.width || 360,
+    height: rect.height || 520
+  };
+}
+
+function clampInspectorPosition(left, top, panel) {
+  const bounds = getInspectorBounds(panel);
+  const maxLeft = Math.max(12, window.innerWidth - bounds.width - 12);
+  const maxTop = Math.max(12, window.innerHeight - 140);
+
+  return {
+    left: Math.min(Math.max(12, left), maxLeft),
+    top: Math.min(Math.max(12, top), maxTop)
+  };
+}
+
+function applyInspectorPosition(panel, left, top) {
+  const clamped = clampInspectorPosition(left, top, panel);
+  panel.style.left = `${clamped.left}px`;
+  panel.style.top = `${clamped.top}px`;
+  panel.style.right = 'auto';
+}
+
+function handleInspectorDragMove(event) {
+  if (!inspectorDragState) {
+    return;
+  }
+
+  const panel = document.getElementById(INSPECTOR_PANEL_ID);
+  if (!panel) {
+    return;
+  }
+
+  const nextLeft = event.clientX - inspectorDragState.offsetX;
+  const nextTop = event.clientY - inspectorDragState.offsetY;
+  applyInspectorPosition(panel, nextLeft, nextTop);
+}
+
+function stopInspectorDragging() {
+  inspectorDragState = null;
+  document.removeEventListener('mousemove', handleInspectorDragMove, true);
+  document.removeEventListener('mouseup', stopInspectorDragging, true);
+}
+
+function startInspectorDragging(event) {
+  const panel = document.getElementById(INSPECTOR_PANEL_ID);
+  if (!panel) {
+    return;
+  }
+
+  const rect = panel.getBoundingClientRect();
+  inspectorDragState = {
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top
+  };
+
+  panel.style.right = 'auto';
+  panel.style.left = `${rect.left}px`;
+  panel.style.top = `${rect.top}px`;
+
+  document.addEventListener('mousemove', handleInspectorDragMove, true);
+  document.addEventListener('mouseup', stopInspectorDragging, true);
+}
+
+function renderInspectorPanel() {
+  const panel = ensureInspectorPanel();
+  if (!panel) {
+    return;
+  }
+
+  const selection = selectedInspectorData;
+  const compactClass = inspectorPinned ? '' : 'style="display:none;"';
+  const selectionMarkup = selection ? `
+    <div style="padding:14px 18px 0;font-size:12px;color:#72624f;">${escapeHtml(selection.summary || selection.descriptor || '')}</div>
+    ${[
+      ['XPath', selection.xpath],
+      ['CSS', selection.css],
+      ['Playwright', selection.playwright],
+      ['Cypress', selection.cypress],
+      ['Selenium', selection.selenium]
+    ].map(([label, value]) => `
+      <div style="padding:12px 18px 0;">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:6px;">
+          <strong style="font-size:12px;">${escapeHtml(label)}</strong>
+          <button type="button" data-inspector-copy="${escapeHtml(value || '')}" style="border:0;border-radius:999px;padding:6px 10px;background:rgba(13,107,103,0.12);color:#0d6b67;font-size:11px;font-weight:700;cursor:pointer;">Copy</button>
+        </div>
+        <div style="padding:10px 12px;border-radius:12px;background:rgba(245,240,231,0.72);font:12px/1.5 Consolas, monospace;word-break:break-word;">${escapeHtml(value || 'Unavailable')}</div>
+      </div>
+    `).join('')}
+  ` : '<div style="padding:18px;color:#72624f;font-size:13px;line-height:1.5;">Click any element on the page to capture selectors.</div>';
+
+  panel.innerHTML = `
+    <div id="as-inspector-header" style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:16px 18px;border-bottom:1px solid rgba(138,113,76,0.12);cursor:move;user-select:none;">
+      <div>
+        <div style="font-size:15px;font-weight:700;">Live Inspector</div>
+        <div style="margin-top:4px;font-size:12px;color:#72624f;">Click elements to capture selectors.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button type="button" id="as-inspector-pin-btn" style="border:0;border-radius:999px;padding:7px 10px;background:rgba(199,119,46,0.12);color:#9b5416;font-size:11px;font-weight:700;cursor:pointer;">${inspectorPinned ? 'Pinned' : 'Compact'}</button>
+        <button type="button" id="as-inspector-close-btn" style="border:0;border-radius:999px;padding:7px 10px;background:rgba(200,74,53,0.12);color:#c84a35;font-size:11px;font-weight:700;cursor:pointer;">Close</button>
+      </div>
+    </div>
+    <div style="max-height:min(420px, calc(100vh - 140px));overflow:auto;" ${compactClass}>${selectionMarkup}</div>
+  `;
+
+  panel.querySelector('#as-inspector-header')?.addEventListener('mousedown', (event) => {
+    if (event.target instanceof Element && event.target.closest('button')) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    startInspectorDragging(event);
+  });
+
+  panel.querySelector('#as-inspector-close-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    stopInspectorMode();
+  });
+
+  panel.querySelector('#as-inspector-pin-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    inspectorPinned = !inspectorPinned;
+    renderInspectorPanel();
+  });
+
+  Array.from(panel.querySelectorAll('[data-inspector-copy]')).forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const value = button.getAttribute('data-inspector-copy') || '';
+      if (!value) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch (error) {
+        console.warn('Unable to copy inspector value:', error);
+      }
+    });
+  });
+}
+
+function applyInspectorHighlight(element) {
+  if (!(element instanceof Element)) {
+    return;
+  }
+
+  if (hoveredInspectorElement && hoveredInspectorElement !== element) {
+    hoveredInspectorElement.classList.remove('test-recorder-highlight');
+  }
+
+  hoveredInspectorElement = element;
+  element.classList.add('test-recorder-highlight');
+}
+
+function handleInspectorMove(event) {
+  if (!inspectorEnabled || isRecorderUiElement(event.target)) {
+    return;
+  }
+
+  const element = findRecordableElement(event.target, 'click') || event.target;
+  if (element instanceof Element) {
+    applyInspectorHighlight(element);
+  }
+}
+
+async function handleInspectorClick(event) {
+  if (!inspectorEnabled || isRecorderUiElement(event.target)) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const element = findRecordableElement(event.target, 'click') || event.target;
+  if (!(element instanceof Element)) {
+    return;
+  }
+
+  selectedInspectorData = buildInspectorSelection(element);
+  renderInspectorPanel();
+
+  try {
+    await sendRuntimeMessage({ action: 'setInspectorSelection', data: selectedInspectorData });
+  } catch (error) {
+    console.warn('Unable to persist inspector selection:', error);
+  }
+}
+
+function handleInspectorKeydown(event) {
+  if (event.key === 'Escape') {
+    stopInspectorMode();
+  }
+}
+
+function startInspectorMode() {
+  inspectorEnabled = true;
+  renderInspectorPanel();
+  document.addEventListener('mousemove', handleInspectorMove, true);
+  document.addEventListener('click', handleInspectorClick, true);
+  document.addEventListener('keydown', handleInspectorKeydown, true);
+}
+
+function stopInspectorMode() {
+  inspectorEnabled = false;
+  document.removeEventListener('mousemove', handleInspectorMove, true);
+  document.removeEventListener('click', handleInspectorClick, true);
+  document.removeEventListener('keydown', handleInspectorKeydown, true);
+  stopInspectorDragging();
+  hoveredInspectorElement?.classList.remove('test-recorder-highlight');
+  hoveredInspectorElement = null;
+  const panel = document.getElementById(INSPECTOR_PANEL_ID);
+  if (panel) {
+    panel.remove();
+  }
 }
 
 sendRuntimeMessage({ action: 'getRecordingSession' })

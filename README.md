@@ -1,4 +1,4 @@
-# Test Recorder Pro - Advanced Test Automation Extension
+# AS Web Recorder - Advanced Test Automation Extension
 
 ## 🚀 Features
 
@@ -249,6 +249,42 @@ def test_login():
 - ✅ Edge 90+
 - ✅ Brave 1.0+
 - ✅ Opera 76+
+
+## 🔒 Sharing Without Exposing Source
+
+Browser extensions always ship code to the user's machine, so the source cannot be fully hidden from someone determined to inspect it.
+
+This repository now includes an obfuscated distribution flow to make the shipped code much harder to read:
+
+```powershell
+npm install
+npm run build
+npm run package
+```
+
+That creates:
+
+- `build/dist/` - obfuscated extension folder for loading in `chrome://extensions`
+- `build/AS-Web-Recorder.zip` - zip file you can send to friends
+
+Your friends can use the zip by extracting it and loading the extracted `dist` folder with **Load unpacked** in Chromium-based browsers.
+
+## 🤖 GitHub Actions Build
+
+This repository now includes a GitHub Actions workflow at `.github/workflows/build-pr-zip.yml`.
+
+When you push to a branch whose name starts with `pr`, GitHub Actions will:
+
+- install dependencies
+- build the obfuscated extension
+- create `AS-Web-Recorder.zip`
+- upload the zip as a workflow artifact
+
+Supported branch patterns:
+
+- `pr-my-feature`
+- `pr_my_feature`
+- `pr/my-feature`
 
 ## 🐛 Troubleshooting
 
