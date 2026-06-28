@@ -3,7 +3,7 @@ name: Build Extension Zip
 on:
   push:
     branches:
-      - 'pr-*'
+      - 'main'
       - 'pr_*'
       - 'pr/**'
 
