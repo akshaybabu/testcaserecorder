@@ -1,3 +1,764 @@
+const modernPopupStyle = document.createElement('style');
+modernPopupStyle.textContent = `
+  :root {
+    --as-ink: #221f1a;
+    --as-muted: #72624f;
+    --as-soft: #9c8c77;
+    --as-accent: #c7772e;
+    --as-accent-deep: #9b5416;
+    --as-teal: #0d6b67;
+    --as-danger: #c84a35;
+    --as-success: #1f7a5c;
+    --as-panel: rgba(255, 252, 247, 0.92);
+    --as-line: rgba(138, 113, 76, 0.18);
+    --as-shadow: 0 22px 56px rgba(72, 49, 26, 0.14);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    width: 1040px;
+    min-height: 720px;
+    background:
+      radial-gradient(circle at top left, rgba(199, 119, 46, 0.18), transparent 34%),
+      radial-gradient(circle at bottom right, rgba(13, 107, 103, 0.15), transparent 28%),
+      linear-gradient(135deg, #f9f6f0 0%, #f2eee7 48%, #ede4d5 100%);
+    color: var(--as-ink);
+    font-family: "Aptos", "Segoe UI", sans-serif;
+  }
+
+  button, input, select, textarea { font: inherit; }
+
+  .container {
+    margin: 0;
+    padding: 18px;
+    background: transparent;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 14px;
+    padding: 18px 22px;
+    border: 1px solid rgba(77, 53, 29, 0.08);
+    border-radius: 24px;
+    background: linear-gradient(135deg, rgba(255, 250, 244, 0.96), rgba(255, 247, 238, 0.88));
+    box-shadow: var(--as-shadow);
+  }
+
+  .brand-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--as-accent), #edb36d);
+    color: white;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+  }
+
+  .brand-copy small {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--as-soft);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .header h1 {
+    margin: 0;
+    color: var(--as-ink);
+    font-size: 28px;
+    letter-spacing: -0.04em;
+  }
+
+  .hero-buttons {
+    display: flex;
+    gap: 10px;
+  }
+
+  .hero-btn, .version {
+    border: 0;
+    border-radius: 999px;
+    padding: 11px 16px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .hero-btn {
+    background: rgba(255,255,255,0.78);
+    color: var(--as-accent-deep);
+    cursor: pointer;
+  }
+
+  .version {
+    background: rgba(13, 107, 103, 0.1);
+    color: var(--as-teal);
+  }
+
+  .workspace-banner {
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .workspace-card {
+    border: 1px solid var(--as-line);
+    border-radius: 24px;
+    background: var(--as-panel);
+    box-shadow: var(--as-shadow);
+    padding: 18px;
+  }
+
+  .workspace-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--as-soft);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .workspace-title-row, .workspace-meta-row, .workspace-controls, .workspace-subcontrols, .status, .panel-head, .api-meta {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .workspace-title-row { margin-bottom: 10px; }
+
+  .workspace-title {
+    flex: 1;
+    padding: 14px 16px;
+    border: 1px solid rgba(145, 118, 84, 0.15);
+    border-radius: 14px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    background: rgba(255,255,255,0.82);
+  }
+
+  .workspace-meta {
+    padding: 11px 13px;
+    border: 1px solid rgba(145, 118, 84, 0.15);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.82);
+  }
+
+  .workspace-meta.project { flex: 1; }
+  .workspace-meta.wait { max-width: 130px; }
+  .workspace-meta.mode { max-width: 180px; }
+  .workspace-meta.url.hidden { display: none; }
+  .launch-hint {
+    margin-top: 10px;
+    color: var(--as-muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .counter-badge, .status-count, .status-text {
+    display: inline-flex;
+    align-items: center;
+    padding: 9px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .counter-badge {
+    background: rgba(199, 119, 46, 0.12);
+    color: var(--as-accent-deep);
+  }
+
+  .workspace-controls { margin-bottom: 10px; }
+
+  .btn {
+    border: 0;
+    border-radius: 16px;
+    padding: 12px 14px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  }
+
+  .btn:hover:not(:disabled) { transform: translateY(-1px); }
+
+  .btn-primary { background: linear-gradient(135deg, #149271, #2eb98a); box-shadow: 0 14px 24px rgba(20, 146, 113, 0.22); color: white; }
+  .btn-warning { background: linear-gradient(135deg, #d68f26, #edb552); box-shadow: 0 14px 24px rgba(214, 143, 38, 0.22); color: white; }
+  .btn-danger { background: linear-gradient(135deg, #ba4a31, #de6b4d); box-shadow: 0 14px 24px rgba(186, 74, 49, 0.22); color: white; }
+  .btn-secondary { background: rgba(255,255,255,0.78); color: var(--as-accent-deep); border: 1px solid rgba(199, 119, 46, 0.12); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+  .workspace-subcontrols { justify-content: space-between; }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 6px;
+    border-radius: 999px;
+    background: rgba(255, 252, 247, 0.78);
+    border: 1px solid rgba(145, 118, 84, 0.1);
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--as-muted);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .tab-btn.active {
+    background: linear-gradient(135deg, rgba(199, 119, 46, 0.16), rgba(199, 119, 46, 0.08));
+    color: var(--as-accent-deep);
+  }
+
+  .tab-content {
+    display: none;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .tab-content.active { display: block; }
+
+  .recorder-grid, .settings-grid, .assertions-grid {
+    display: grid;
+    gap: 14px;
+  }
+
+  .recorder-grid { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.9fr); }
+  .assertions-grid { grid-template-columns: 1fr 1.15fr; }
+  .settings-grid { grid-template-columns: 0.9fr 1.1fr; }
+
+  .panel-shell {
+    border: 1px solid var(--as-line);
+    border-radius: 24px;
+    background: var(--as-panel);
+    box-shadow: var(--as-shadow);
+    padding: 18px;
+  }
+
+  .panel-head {
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .panel-head h2, .panel-head h3 {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: -0.03em;
+  }
+
+  .panel-head p, .callout li {
+    margin: 6px 0 0;
+    color: var(--as-muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .callout {
+    border-radius: 18px;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, rgba(13, 107, 103, 0.1), rgba(199, 119, 46, 0.08));
+  }
+
+  .callout strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--as-teal);
+  }
+
+  .callout ol { margin: 0; padding-left: 18px; }
+
+  .recording-options, .export-options, .settings-group, .recorded-steps-list, .assertions-list, .network-list, .playback-results, .saved-tests {
+    border: 1px solid var(--as-line);
+    border-radius: 18px;
+    background: rgba(255,255,255,0.72);
+    box-shadow: none;
+  }
+
+  .recording-options, .export-options, .settings-group {
+    padding: 14px;
+  }
+
+  .recording-options.hidden, .assertion-controls, #networkFilter, .legacy-hidden {
+    display: none !important;
+  }
+
+  .recorded-steps-list, .assertions-list, .network-list, .playback-results, .saved-tests {
+    max-height: 478px;
+    overflow: auto;
+  }
+
+  .recorded-step-item, .playback-item, .saved-test-item, .assertion-item, .network-item {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(145, 118, 84, 0.08);
+    background: rgba(255,255,255,0.5);
+  }
+
+  .recorded-step-item:last-child, .playback-item:last-child, .saved-test-item:last-child, .assertion-item:last-child, .network-item:last-child { border-bottom: 0; }
+  .recorded-step-item { border-left: 4px solid var(--as-accent); }
+  .network-item { border-left: 4px solid var(--as-teal); }
+
+  .step-body { display: flex; gap: 10px; align-items: flex-start; }
+  .step-copy { flex: 1; min-width: 0; }
+  .step-summary { font-size: 13px; font-weight: 700; line-height: 1.4; }
+  .step-meta { margin-top: 6px; color: var(--as-muted); font-size: 12px; line-height: 1.45; word-break: break-word; }
+  .step-preview-image, .api-preview-thumb { width: 76px; height: 52px; border-radius: 12px; border: 1px solid rgba(145, 118, 84, 0.12); object-fit: cover; background: rgba(255,255,255,0.88); }
+
+  .locator-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .locator-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 132px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(199, 119, 46, 0.12);
+    color: var(--as-accent-deep);
+    font-size: 10px;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .item-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(13, 107, 103, 0.12);
+    color: var(--as-teal);
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .empty-state {
+    padding: 28px 20px;
+    color: var(--as-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  .status {
+    flex-wrap: wrap;
+    margin-bottom: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .status-text {
+    background: rgba(130, 103, 73, 0.1);
+    color: var(--as-muted);
+  }
+
+  .status-count {
+    background: rgba(130, 103, 73, 0.08);
+    color: var(--as-muted);
+  }
+
+  .notifications {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    width: min(320px, calc(100vw - 32px));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .notification {
+    padding: 12px 14px;
+    border-radius: 14px;
+    box-shadow: 0 18px 28px rgba(72, 49, 26, 0.18);
+    background: #fffdf8;
+    border: 1px solid rgba(145, 118, 84, 0.12);
+    color: var(--as-ink);
+    font-size: 13px;
+  }
+
+  .notification.error { border-color: rgba(200, 74, 53, 0.28); color: var(--as-danger); }
+  .notification.warning { border-color: rgba(199, 119, 46, 0.28); color: var(--as-accent-deep); }
+
+  .api-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 14px;
+  }
+
+  .api-url-row, .api-header-row {
+    display: grid;
+    gap: 10px;
+  }
+
+  .api-url-row { grid-template-columns: 132px 1fr; margin-bottom: 12px; }
+  .api-header-row { grid-template-columns: 1fr 1fr 78px; }
+  .api-header-list { display: flex; flex-direction: column; gap: 8px; }
+  .api-block + .api-block { margin-top: 14px; }
+  .api-block-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .api-input, .api-select, .api-textarea, .api-output, #scriptPreview, .input-field, .select-field {
+    width: 100%;
+    padding: 12px 13px;
+    border: 1px solid rgba(145, 118, 84, 0.15);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.82);
+    color: var(--as-ink);
+  }
+
+  .api-textarea, .api-output, #scriptPreview {
+    min-height: 156px;
+    resize: vertical;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  #scriptPreview { min-height: 460px; }
+  .api-output { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .response-panels { display: grid; gap: 14px; margin-top: 14px; }
+  .saved-tests .item-header { align-items: flex-start; }
+`;
+document.head.appendChild(modernPopupStyle);
+
+document.body.innerHTML = `
+  <div class="container">
+    <div class="header">
+      <div class="brand-wrap">
+        <div class="brand-mark">AS</div>
+        <div class="brand-copy">
+          <small>QA automation workspace</small>
+          <h1>AS Web Recorder</h1>
+        </div>
+      </div>
+      <div class="hero-buttons">
+        <button id="launchInspectorQuick" class="hero-btn" type="button">Inspect</button>
+        <span class="version">Modernized</span>
+      </div>
+    </div>
+
+    <div class="workspace-banner">
+      <div class="workspace-card">
+        <label class="workspace-label" for="testCaseName">Test case name</label>
+        <div class="workspace-title-row">
+          <input id="testCaseName" class="workspace-title" placeholder="Checkout flow - guest user">
+          <span id="stepCounterBadge" class="counter-badge">0 steps</span>
+        </div>
+        <div class="workspace-meta-row">
+          <input id="projectName" class="workspace-meta project" placeholder="Project or suite">
+          <input id="waitTimeout" class="workspace-meta wait" type="number" value="5000" min="1000" step="500">
+        </div>
+        <div class="workspace-meta-row" style="margin-top:10px;">
+          <select id="recordTargetMode" class="workspace-meta mode">
+            <option value="existing">Use existing browser tab</option>
+            <option value="new">Open new browser window</option>
+          </select>
+          <input id="freshBrowserUrl" class="workspace-meta project url hidden" placeholder="https://example.com">
+        </div>
+        <div id="recordTargetHint" class="launch-hint">Choose whether to record the last active website tab or open a fresh browser window from a URL.</div>
+      </div>
+      <div class="workspace-card">
+        <div class="workspace-controls">
+          <button id="startBtn" class="btn btn-primary">Start</button>
+          <button id="pauseBtn" class="btn btn-warning" disabled>Pause</button>
+          <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
+        </div>
+        <div class="workspace-subcontrols">
+          <button id="previewBtn" class="btn btn-secondary" disabled>Preview Code</button>
+          <button id="downloadBtn" class="btn btn-secondary" disabled>Download</button>
+          <button id="copyBtn" class="btn btn-secondary" disabled>Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="status">
+      <span id="status" class="status-text">Ready</span>
+      <span id="actionCount" class="status-count">Actions: 0</span>
+      <span id="screenshotCount" class="status-count">Screenshots: 0</span>
+      <span id="networkCount" class="status-count legacy-hidden">API Calls: 0</span>
+      <span id="contextBrowser" class="status-count">Browser: -</span>
+      <span id="contextOs" class="status-count">OS: -</span>
+      <span id="contextViewport" class="status-count">Viewport: -</span>
+      <span id="contextClock" class="status-count">Time: -</span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="recording">Recorder</button>
+      <button class="tab-btn" data-tab="assertions">Inspector</button>
+      <button class="tab-btn" data-tab="network">API Lab</button>
+      <button class="tab-btn" data-tab="export">Export</button>
+      <button class="tab-btn" data-tab="playback">Playback</button>
+      <button class="tab-btn" data-tab="settings">Library</button>
+    </div>
+
+    <div class="tab-content active" id="recording">
+      <div class="recorder-grid">
+        <div class="panel-shell">
+          <div class="panel-head">
+            <div>
+              <h2>Recorded Steps</h2>
+              <p>Each step keeps framework-friendly locator references.</p>
+            </div>
+            <button id="clearBtn" class="btn btn-secondary" type="button">Clear</button>
+          </div>
+          <div class="recording-options">
+            <label class="checkbox-label"><input type="checkbox" id="captureScreenshots" checked> Step previews</label>
+            <label class="checkbox-label legacy-hidden"><input type="checkbox" id="captureNetwork"> Monitor network</label>
+            <label class="checkbox-label"><input type="checkbox" id="recordWaits" checked> Record waits</label>
+            <label class="checkbox-label legacy-hidden"><input type="checkbox" id="recordAssertions"> Record assertions</label>
+          </div>
+          <div id="recordedStepsList" class="recorded-steps-list">
+            <div class="empty-state">Recorded steps will appear here as you interact with the page.</div>
+          </div>
+        </div>
+        <div class="panel-shell">
+          <div class="panel-head">
+            <div>
+              <h2>Inspector Summary</h2>
+              <p>Live selector capture with Playwright, Cypress, and Selenium-friendly output.</p>
+            </div>
+            <button id="launchInspectorBtn" class="btn btn-secondary" type="button">Launch</button>
+          </div>
+          <div id="inspectorSummaryCard" class="assertions-list">
+            <div class="empty-state">Launch the live inspector, click any element on the page, and reopen the popup to copy selectors.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="assertions">
+      <div class="assertions-grid">
+        <div class="panel-shell">
+          <div class="panel-head">
+            <div>
+              <h2>Live Inspector</h2>
+              <p>Use the on-page panel to pin, inspect, and copy selector formats directly from the browser.</p>
+            </div>
+            <div class="hero-buttons">
+              <button id="startInspectorBtn" class="hero-btn" type="button">Start Inspector</button>
+              <button id="stopInspectorBtn" class="hero-btn" type="button">Stop</button>
+            </div>
+          </div>
+          <div class="callout">
+            <strong>Workflow</strong>
+            <ol>
+              <li>Open the target page.</li>
+              <li>Start the live inspector.</li>
+              <li>Click any element to capture CSS, XPath, Selenium, Playwright, and Cypress locators.</li>
+              <li>Use the pin icon in the page panel to keep it docked while you keep exploring.</li>
+            </ol>
+          </div>
+          <button id="addAssertionBtn" class="legacy-hidden" type="button">Hidden</button>
+        </div>
+        <div class="panel-shell">
+          <div class="panel-head">
+            <div>
+              <h2>Selected Element</h2>
+              <p>Detailed selector pack for the most recent inspected element.</p>
+            </div>
+          </div>
+          <div id="assertionsList" class="assertions-list">
+            <div class="empty-state">No element selected yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="network">
+      <div class="panel-shell">
+        <div class="panel-head">
+          <div>
+            <h2>API Lab</h2>
+            <p>Execute requests, inspect responses, and keep a lightweight request history inside the extension.</p>
+          </div>
+          <div class="hero-buttons">
+            <button id="sendApiBtn" class="hero-btn" type="button">Send Request</button>
+            <button id="saveApiPresetBtn" class="hero-btn" type="button">Save Snapshot</button>
+          </div>
+        </div>
+        <div class="api-grid">
+          <div>
+            <div class="api-url-row">
+              <select id="apiMethod" class="api-select">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="PATCH">PATCH</option>
+                <option value="DELETE">DELETE</option>
+              </select>
+              <input id="apiUrl" class="api-input" placeholder="https://api.example.com/orders/123">
+            </div>
+            <div class="api-block">
+              <div class="api-block-head">
+                <h3>Headers</h3>
+                <button id="addHeaderBtn" class="hero-btn" type="button">Add header</button>
+              </div>
+              <div id="apiHeadersList" class="api-header-list"></div>
+            </div>
+            <div class="api-block">
+              <div class="api-block-head">
+                <h3>Request Body</h3>
+                <span class="status-count">Optional for POST, PUT, and PATCH.</span>
+              </div>
+              <textarea id="apiBody" class="api-textarea" placeholder='{"email":"qa@example.com"}'></textarea>
+            </div>
+            <div class="api-block">
+              <div class="api-block-head">
+                <h3>Recent Snapshots</h3>
+              </div>
+              <div id="apiHistory" class="saved-tests">
+                <div class="empty-state">Saved API runs will appear here.</div>
+              </div>
+            </div>
+            <div id="networkList" class="network-list legacy-hidden"></div>
+          </div>
+          <div>
+            <div class="api-meta">
+              <span id="apiStatusBadge" class="status-text">Idle</span>
+              <span id="apiDuration" class="status-count">Duration: -</span>
+              <span id="apiBytes" class="status-count">Size: -</span>
+            </div>
+            <div class="response-panels">
+              <div>
+                <div class="api-block-head">
+                  <h3>Response Body</h3>
+                  <button id="copyApiResponseBtn" class="hero-btn" type="button">Copy</button>
+                </div>
+                <pre id="apiResponseOutput" class="api-output">Run a request to inspect the response body.</pre>
+              </div>
+              <div>
+                <div class="api-block-head"><h3>Response Headers</h3></div>
+                <pre id="apiHeadersOutput" class="api-output">Headers will appear here.</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="export">
+      <div class="panel-shell">
+        <div class="panel-head">
+          <div>
+            <h2>Export Studio</h2>
+            <p>Generate framework-ready automation code from the recorder timeline.</p>
+          </div>
+        </div>
+        <div class="export-options">
+          <label>Export Format:</label>
+          <select id="formatSelect" class="select-field">
+            <option value="playwright-js">Playwright (JavaScript)</option>
+            <option value="playwright-python">Playwright (Python)</option>
+            <option value="cypress">Cypress</option>
+            <option value="selenium-python">Selenium (Python)</option>
+            <option value="selenium-java">Selenium (Java)</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+        <div class="export-options">
+          <label class="checkbox-label"><input type="checkbox" id="includeScreenshots" checked> Include screenshots</label>
+          <label class="checkbox-label legacy-hidden"><input type="checkbox" id="includeNetwork"> Network calls</label>
+          <label class="checkbox-label legacy-hidden"><input type="checkbox" id="includeAssertions"> Assertions</label>
+        </div>
+        <textarea id="scriptPreview" placeholder="Script preview will appear here..."></textarea>
+      </div>
+    </div>
+
+    <div class="tab-content" id="playback">
+      <div class="panel-shell">
+        <div class="panel-head">
+          <div>
+            <h2>Playback Console</h2>
+            <p>Replay the recorded scenario against the active tab using the strongest locator match available.</p>
+          </div>
+        </div>
+        <div class="playback-controls">
+          <button id="playbackBtn" class="btn btn-primary" disabled>Play Test</button>
+          <button id="stopPlaybackBtn" class="btn btn-danger" disabled>Stop</button>
+        </div>
+        <div class="playback-options">
+          <label>Speed:
+            <select id="playbackSpeed" class="select-field">
+              <option value="1">1x</option>
+              <option value="2">2x</option>
+              <option value="0.5">0.5x</option>
+            </select>
+          </label>
+        </div>
+        <div id="playbackResults" class="playback-results">
+          <div class="empty-state">Playback results will appear here.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="settings">
+      <div class="settings-grid">
+        <div class="panel-shell">
+          <div class="panel-head">
+            <div>
+              <h2>Workspace Settings</h2>
+              <p>Keep the recorder tuned for your workflow.</p>
+            </div>
+          </div>
+          <div class="settings-group">
+            <h3>Screenshot quality</h3>
+            <select id="screenshotQuality" class="select-field">
+              <option value="high">High</option>
+              <option value="medium" selected>Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <div class="settings-group">
+            <h3>Saved sessions</h3>
+            <button id="saveTestBtn" class="btn btn-secondary">Save Test Case</button>
+            <button id="loadTestBtn" class="btn btn-secondary">Load by Name</button>
+          </div>
+        </div>
+        <div class="panel-shell">
+          <div class="panel-head">
+            <div>
+              <h2>Saved Test Cases</h2>
+              <p>Reload previous recorder sessions instantly.</p>
+            </div>
+          </div>
+          <div id="savedTests" class="saved-tests">
+            <div class="empty-state">No saved test cases yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="notifications" class="notifications"></div>
+  </div>
+`;
+
 let isRecording = false;
 let isPaused = false;
 let recordedActions = [];
@@ -52,7 +813,34 @@ const saveTestBtn = document.getElementById('saveTestBtn');
 const loadTestBtn = document.getElementById('loadTestBtn');
 const testCaseNameInput = document.getElementById('testCaseName');
 const projectNameInput = document.getElementById('projectName');
+const recordTargetModeSelect = document.getElementById('recordTargetMode');
+const freshBrowserUrlInput = document.getElementById('freshBrowserUrl');
+const recordTargetHint = document.getElementById('recordTargetHint');
 const savedTests = document.getElementById('savedTests');
+const stepCounterBadge = document.getElementById('stepCounterBadge');
+const contextBrowserEl = document.getElementById('contextBrowser');
+const contextOsEl = document.getElementById('contextOs');
+const contextViewportEl = document.getElementById('contextViewport');
+const contextClockEl = document.getElementById('contextClock');
+const launchInspectorQuickBtn = document.getElementById('launchInspectorQuick');
+const launchInspectorBtn = document.getElementById('launchInspectorBtn');
+const startInspectorBtn = document.getElementById('startInspectorBtn');
+const stopInspectorBtn = document.getElementById('stopInspectorBtn');
+const inspectorSummaryCard = document.getElementById('inspectorSummaryCard');
+const apiMethodSelect = document.getElementById('apiMethod');
+const apiUrlInput = document.getElementById('apiUrl');
+const apiHeadersList = document.getElementById('apiHeadersList');
+const apiBodyInput = document.getElementById('apiBody');
+const apiHistoryList = document.getElementById('apiHistory');
+const apiStatusBadge = document.getElementById('apiStatusBadge');
+const apiDurationEl = document.getElementById('apiDuration');
+const apiBytesEl = document.getElementById('apiBytes');
+const apiResponseOutput = document.getElementById('apiResponseOutput');
+const apiHeadersOutput = document.getElementById('apiHeadersOutput');
+const addHeaderBtn = document.getElementById('addHeaderBtn');
+const sendApiBtn = document.getElementById('sendApiBtn');
+const saveApiPresetBtn = document.getElementById('saveApiPresetBtn');
+const copyApiResponseBtn = document.getElementById('copyApiResponseBtn');
 
 startBtn.addEventListener('click', startRecording);
 stopBtn.addEventListener('click', stopRecording);
@@ -73,6 +861,38 @@ loadTestBtn.addEventListener('click', loadTestCase);
       updatePreview();
     }
   });
+});
+[
+  launchInspectorQuickBtn,
+  launchInspectorBtn,
+  startInspectorBtn
+].forEach((button) => button?.addEventListener('click', () => {
+  void launchInspectorMode();
+}));
+stopInspectorBtn?.addEventListener('click', () => {
+  void stopInspectorMode();
+});
+addHeaderBtn?.addEventListener('click', () => addHeaderRow());
+sendApiBtn?.addEventListener('click', () => {
+  void executeApiRequest();
+});
+saveApiPresetBtn?.addEventListener('click', () => {
+  void persistApiState(true);
+});
+copyApiResponseBtn?.addEventListener('click', () => {
+  copyPlainText(apiResponseOutput?.textContent || '', 'Response copied to clipboard.');
+});
+recordTargetModeSelect?.addEventListener('change', updateRecordingTargetUi);
+['input', 'change'].forEach((eventName) => {
+  apiMethodSelect?.addEventListener(eventName, () => { void persistApiState(); });
+  apiUrlInput?.addEventListener(eventName, () => { void persistApiState(); });
+  apiBodyInput?.addEventListener(eventName, () => { void persistApiState(); });
+});
+document.addEventListener('click', (event) => {
+  const copyButton = event.target.closest('[data-copy-value]');
+  if (copyButton) {
+    copyPlainText(copyButton.getAttribute('data-copy-value') || '', 'Locator copied to clipboard.');
+  }
 });
 
 function sendRuntimeMessage(message) {
@@ -166,6 +986,66 @@ async function ensureRecorderReady(tab) {
   await insertContentStyles(tab.id);
   await insertContentScript(tab.id);
   await sendTabMessage(tab.id, { action: 'ping' });
+}
+
+function updateRecordingTargetUi() {
+  const isNewBrowserMode = recordTargetModeSelect?.value === 'new';
+  freshBrowserUrlInput?.classList.toggle('hidden', !isNewBrowserMode);
+  if (recordTargetHint) {
+    recordTargetHint.textContent = isNewBrowserMode
+      ? 'A fresh browser window will open with this URL, then recording will start there.'
+      : 'Recording will attach to the last active normal browser tab instead of the extension window.';
+  }
+}
+
+function waitForTabComplete(tabId, timeoutMs = 12000) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        chrome.tabs.onUpdated.removeListener(handleUpdated);
+        resolve();
+      }
+    }, timeoutMs);
+
+    const handleUpdated = (updatedTabId, changeInfo) => {
+      if (updatedTabId !== tabId) {
+        return;
+      }
+
+      if (changeInfo.status === 'complete' && !settled) {
+        settled = true;
+        clearTimeout(timeout);
+        chrome.tabs.onUpdated.removeListener(handleUpdated);
+        resolve();
+      }
+    };
+
+    chrome.tabs.onUpdated.addListener(handleUpdated);
+  });
+}
+
+async function getPreparedBrowserTab(mode = 'existing', url = '') {
+  const response = await sendRuntimeMessage({
+    action: 'prepareRecordingTarget',
+    data: { mode, url }
+  });
+
+  if (!response?.success || !response.data?.tabId) {
+    throw new Error(response?.error || 'Unable to prepare a browser tab.');
+  }
+
+  if (mode === 'new') {
+    await waitForTabComplete(response.data.tabId);
+  }
+
+  const tab = await chrome.tabs.get(response.data.tabId);
+  if (!tab?.id) {
+    throw new Error('Browser tab is no longer available.');
+  }
+
+  return tab;
 }
 
 async function loadRecordingSession() {
@@ -319,13 +1199,8 @@ function renderNetworkList() {
 
 async function startRecording() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-    if (!tab?.id) {
-      showNotification('No active browser tab is available for recording.', 'error');
-      return;
-    }
-
+    const targetMode = recordTargetModeSelect?.value || 'existing';
+    const tab = await getPreparedBrowserTab(targetMode, freshBrowserUrlInput?.value || '');
     await ensureRecorderReady(tab);
 
     currentTabId = tab.id;
@@ -352,7 +1227,13 @@ async function startRecording() {
       }
     });
 
-  showNotification('🔴 Recording started!');
+    await refreshContextStrip();
+    showNotification(
+      targetMode === 'new'
+        ? 'New browser window opened and recording started.'
+        : 'Recording started on existing browser tab.',
+      'success'
+    );
   } catch (error) {
     isRecording = false;
     isPaused = false;
@@ -1393,9 +2274,9 @@ async function playbackTest() {
   playbackResults.innerHTML = '<div class="playback-item">▶ Starting playback...</div>';
 
   const speed = parseFloat(document.getElementById('playbackSpeed').value);
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   try {
+    const tab = await getPreparedBrowserTab('existing');
     await ensureRecorderReady(tab);
 
     for (let i = 0; i < recordedActions.length && isPlaying; i++) {
@@ -1438,22 +2319,6 @@ async function playbackTest() {
     stopPlaybackBtn.disabled = true;
     isPlaying = false;
   }
-  return;
-
-  for (let i = 0; i < recordedActions.length && isPlaying; i++) {
-    const action = recordedActions[i];
-    const delay = 1000 / speed;
-    await new Promise(resolve => setTimeout(resolve, delay));
-
-    if (!isPlaying) break;
-
-    addPlaybackResult(action, i + 1, 'pass');
-  }
-
-  addPlaybackResult(null, recordedActions.length, 'pass', 'Playback completed!');
-  playbackBtn.disabled = false;
-  stopPlaybackBtn.disabled = true;
-  isPlaying = false;
 }
 
 function stopPlayback() {
@@ -1576,6 +2441,9 @@ function updateUI() {
   actionCountEl.textContent = `Actions: ${recordedActions.length}`;
   screenshotCountEl.textContent = `Screenshots: ${screenshots.length}`;
   networkCountEl.textContent = `API Calls: ${networkRequests.length}`;
+  if (stepCounterBadge) {
+    stepCounterBadge.textContent = `${recordedActions.length} ${recordedActions.length === 1 ? 'step' : 'steps'}`;
+  }
   renderRecordedActions();
   renderNetworkList();
 }
@@ -1591,13 +2459,16 @@ function showNotification(message, type = 'info') {
 
 // Listen for updates from background storage sync
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action !== 'recordingSessionUpdated') {
-    return;
+  if (request.action === 'recordingSessionUpdated') {
+    applyRecordingSession(request.data || {});
+    if (scriptPreview.value) {
+      updatePreview();
+    }
   }
 
-  applyRecordingSession(request.data || {});
-  if (scriptPreview.value) {
-    updatePreview();
+  if (request.action === 'inspectorSelectionUpdated') {
+    inspectorSelection = request.data || null;
+    renderInspectorSelection(inspectorSelection);
   }
 
   if (sendResponse) {
@@ -1620,10 +2491,327 @@ function addNetworkItem(call) {
   networkList.scrollTop = networkList.scrollHeight;
 }
 
+function copyPlainText(value, successMessage) {
+  if (!value) {
+    showNotification('Nothing to copy yet.', 'warning');
+    return;
+  }
+
+  navigator.clipboard.writeText(value)
+    .then(() => showNotification(successMessage, 'success'))
+    .catch(() => showNotification('Unable to copy to clipboard.', 'error'));
+}
+
+function detectBrowserName(userAgent) {
+  if (/Edg\//.test(userAgent)) return 'Microsoft Edge';
+  if (/Chrome\//.test(userAgent)) return 'Google Chrome';
+  if (/Firefox\//.test(userAgent)) return 'Firefox';
+  return 'Chromium';
+}
+
+function detectOsName(userAgent) {
+  if (/Windows/i.test(userAgent)) return 'Windows';
+  if (/Macintosh/i.test(userAgent)) return 'macOS';
+  if (/Linux/i.test(userAgent)) return 'Linux';
+  return 'Desktop';
+}
+
+async function refreshContextStrip() {
+  if (contextClockEl) {
+    contextClockEl.textContent = `Time: ${new Date().toLocaleTimeString()}`;
+  }
+
+  if (contextBrowserEl) {
+    contextBrowserEl.textContent = `Browser: ${detectBrowserName(navigator.userAgent)}`;
+  }
+
+  if (contextOsEl) {
+    contextOsEl.textContent = `OS: ${detectOsName(navigator.userAgent)}`;
+  }
+
+  try {
+    const tab = await getPreparedBrowserTab('existing');
+    await ensureRecorderReady(tab);
+    const response = await sendTabMessage(tab.id, { action: 'getPageContext' });
+    if (response?.success && contextViewportEl) {
+      contextViewportEl.textContent = `Viewport: ${response.data.viewport.width}x${response.data.viewport.height}`;
+    }
+  } catch (error) {
+    if (contextViewportEl) {
+      contextViewportEl.textContent = 'Viewport: unavailable';
+    }
+  }
+}
+
+function renderInspectorSelection(selection) {
+  if (!inspectorSummaryCard) {
+    return;
+  }
+
+  if (!selection) {
+    inspectorSummaryCard.innerHTML = '<div class="empty-state">Launch the live inspector, click any element on the page, and reopen the popup to copy selectors.</div>';
+    assertionsList.innerHTML = '<div class="empty-state">No element selected yet.</div>';
+    return;
+  }
+
+  const selectorCard = (label, value) => `
+    <div class="assertion-item">
+      <div class="item-header">
+        <strong>${escapeHtml(label)}</strong>
+        <button class="remove-btn" data-copy-value="${escapeHtml(value)}" style="background:#0d6b67;">Copy</button>
+      </div>
+      <div class="step-meta">${escapeHtml(value)}</div>
+    </div>
+  `;
+
+  inspectorSummaryCard.innerHTML = `
+    <div class="assertion-item">
+      <div class="item-header">
+        <strong>${escapeHtml(selection.descriptor || selection.tagName || 'Selected element')}</strong>
+        <span class="item-badge">LIVE</span>
+      </div>
+      <div class="step-meta">${escapeHtml(selection.summary || selection.url || '')}</div>
+    </div>
+    ${selectorCard('XPath', selection.xpath || 'Unavailable')}
+    ${selectorCard('CSS Selector', selection.css || 'Unavailable')}
+    ${selectorCard('Playwright', selection.playwright || 'Unavailable')}
+  `;
+
+  assertionsList.innerHTML = `
+    <div class="assertion-item">
+      <div class="item-header">
+        <strong>${escapeHtml(selection.descriptor || selection.tagName || 'Selected element')}</strong>
+      </div>
+      <div class="step-meta">${escapeHtml(selection.summary || '')}</div>
+    </div>
+    ${selectorCard('XPath', selection.xpath || 'Unavailable')}
+    ${selectorCard('CSS Selector', selection.css || 'Unavailable')}
+    ${selectorCard('Playwright Locator', selection.playwright || 'Unavailable')}
+    ${selectorCard('Cypress Locator', selection.cypress || 'Unavailable')}
+    ${selectorCard('Selenium Locator', selection.selenium || 'Unavailable')}
+  `;
+}
+
+async function loadInspectorSelection() {
+  try {
+    const response = await sendRuntimeMessage({ action: 'getInspectorSelection' });
+    inspectorSelection = response?.data || null;
+    renderInspectorSelection(inspectorSelection);
+  } catch (error) {
+    console.warn('Unable to load inspector selection:', error);
+  }
+}
+
+async function launchInspectorMode() {
+  try {
+    const tab = await getPreparedBrowserTab('existing');
+    await ensureRecorderReady(tab);
+    await sendTabMessage(tab.id, { action: 'startInspector' });
+    await refreshContextStrip();
+    showNotification('Live inspector launched. Click an element on the page.', 'success');
+  } catch (error) {
+    showNotification(error.message, 'error');
+  }
+}
+
+async function stopInspectorMode() {
+  try {
+    const tab = await getPreparedBrowserTab('existing');
+    await ensureRecorderReady(tab);
+    await sendTabMessage(tab.id, { action: 'stopInspector' });
+    showNotification('Live inspector stopped.', 'success');
+  } catch (error) {
+    showNotification(error.message, 'error');
+  }
+}
+
+function addHeaderRow(key = '', value = '') {
+  if (!apiHeadersList) {
+    return;
+  }
+
+  const row = document.createElement('div');
+  row.className = 'api-header-row';
+  row.innerHTML = `
+    <input class="api-input" placeholder="Header" value="${escapeHtml(key)}">
+    <input class="api-input" placeholder="Value" value="${escapeHtml(value)}">
+    <button class="hero-btn" type="button">Remove</button>
+  `;
+
+  const [headerInput, valueInput, removeBtn] = row.children;
+  headerInput.addEventListener('input', () => { void persistApiState(); });
+  valueInput.addEventListener('input', () => { void persistApiState(); });
+  removeBtn.addEventListener('click', () => {
+    row.remove();
+    void persistApiState();
+  });
+
+  apiHeadersList.appendChild(row);
+}
+
+function collectApiHeaders() {
+  return Array.from(apiHeadersList?.querySelectorAll('.api-header-row') || []).reduce((headers, row) => {
+    const inputs = row.querySelectorAll('input');
+    const key = inputs[0]?.value?.trim();
+    const value = inputs[1]?.value || '';
+    if (key) {
+      headers[key] = value;
+    }
+    return headers;
+  }, {});
+}
+
+function tryFormatJson(text) {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch (error) {
+    return text || 'Empty response body.';
+  }
+}
+
+async function persistApiState(showSavedToast = false) {
+  const payload = {
+    method: apiMethodSelect?.value || 'GET',
+    url: apiUrlInput?.value || '',
+    body: apiBodyInput?.value || '',
+    headers: collectApiHeaders()
+  };
+
+  await chrome.storage.local.set({ apiState: payload });
+  if (showSavedToast) {
+    showNotification('Current API snapshot saved.', 'success');
+  }
+}
+
+function renderApiHistory() {
+  if (!apiHistoryList) {
+    return;
+  }
+
+  if (!apiHistory.length) {
+    apiHistoryList.innerHTML = '<div class="empty-state">Saved API runs will appear here.</div>';
+    return;
+  }
+
+  apiHistoryList.innerHTML = apiHistory.map((entry, index) => `
+    <div class="saved-test-item">
+      <div class="item-header">
+        <div>
+          <strong>${escapeHtml(entry.method)} ${escapeHtml(entry.url)}</strong><br>
+          <small>${escapeHtml(entry.responseStatus)} • ${escapeHtml(entry.savedAt)} • ${escapeHtml(String(entry.duration))} ms</small>
+        </div>
+        <button class="remove-btn" data-api-index="${index}" style="background:#0d6b67;">Load</button>
+      </div>
+    </div>
+  `).join('');
+
+  Array.from(apiHistoryList.querySelectorAll('[data-api-index]')).forEach((button) => {
+    button.addEventListener('click', () => {
+      loadApiSnapshot(Number(button.getAttribute('data-api-index')));
+    });
+  });
+}
+
+function loadApiSnapshot(index) {
+  const snapshot = apiHistory[index];
+  if (!snapshot) {
+    return;
+  }
+
+  apiMethodSelect.value = snapshot.method || 'GET';
+  apiUrlInput.value = snapshot.url || '';
+  apiBodyInput.value = snapshot.body || '';
+  apiHeadersList.innerHTML = '';
+  Object.entries(snapshot.headers || {}).forEach(([key, value]) => addHeaderRow(key, value));
+  void persistApiState();
+  showNotification('API snapshot loaded.', 'success');
+}
+
+async function loadApiState() {
+  const result = await chrome.storage.local.get(['apiState', 'apiHistory']);
+  const apiState = result.apiState || {};
+  apiHistory = Array.isArray(result.apiHistory) ? result.apiHistory : [];
+
+  if (apiMethodSelect) apiMethodSelect.value = apiState.method || 'GET';
+  if (apiUrlInput) apiUrlInput.value = apiState.url || '';
+  if (apiBodyInput) apiBodyInput.value = apiState.body || '';
+
+  if (apiHeadersList) {
+    apiHeadersList.innerHTML = '';
+    const headerEntries = Object.entries(apiState.headers || {});
+    if (headerEntries.length) {
+      headerEntries.forEach(([key, value]) => addHeaderRow(key, value));
+    } else {
+      addHeaderRow('Content-Type', 'application/json');
+    }
+  }
+
+  renderApiHistory();
+}
+
+async function executeApiRequest() {
+  const url = apiUrlInput?.value?.trim();
+  if (!url) {
+    showNotification('Enter an API URL first.', 'warning');
+    return;
+  }
+
+  const method = apiMethodSelect?.value || 'GET';
+  const headers = collectApiHeaders();
+  const body = apiBodyInput?.value?.trim() || '';
+  const options = { method, headers };
+  if (body && !['GET', 'HEAD'].includes(method)) {
+    options.body = body;
+  }
+
+  const startedAt = performance.now();
+
+  try {
+    const response = await fetch(url, options);
+    const responseText = await response.text();
+    const duration = Math.round(performance.now() - startedAt);
+    const formattedBody = tryFormatJson(responseText);
+    const responseHeaders = Object.fromEntries(response.headers.entries());
+
+    apiStatusBadge.textContent = `${response.status} ${response.statusText}`;
+    apiDurationEl.textContent = `Duration: ${duration} ms`;
+    apiBytesEl.textContent = `Size: ${new Blob([responseText]).size} bytes`;
+    apiResponseOutput.textContent = formattedBody;
+    apiHeadersOutput.textContent = JSON.stringify(responseHeaders, null, 2);
+
+    apiHistory.unshift({
+      method,
+      url,
+      headers,
+      body,
+      responseStatus: `${response.status} ${response.statusText}`,
+      duration,
+      savedAt: new Date().toLocaleString()
+    });
+    apiHistory = apiHistory.slice(0, 8);
+    await chrome.storage.local.set({ apiHistory });
+    renderApiHistory();
+    await persistApiState();
+    showNotification('API request completed.', response.ok ? 'success' : 'warning');
+  } catch (error) {
+    apiStatusBadge.textContent = 'Request failed';
+    apiDurationEl.textContent = `Duration: ${Math.round(performance.now() - startedAt)} ms`;
+    apiBytesEl.textContent = 'Size: -';
+    apiResponseOutput.textContent = error.message;
+    apiHeadersOutput.textContent = 'No response headers available.';
+    showNotification(error.message, 'error');
+  }
+}
+
 async function initializePopup() {
+  updateRecordingTargetUi();
   await loadRecordingSession();
+  await loadInspectorSelection();
+  await loadApiState();
   loadSavedTests();
+  await refreshContextStrip();
   updateUI();
 }
 
 initializePopup();
+

@@ -1,0 +1,13 @@
+{
+  "name": "as-web-recorder",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Build tooling for creating an obfuscated distribution of the AS Web Recorder browser extension.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.1.1"
+  }
+}
